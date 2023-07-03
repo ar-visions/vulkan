@@ -1,4 +1,3 @@
-
 ## install base headers
 file(GLOB INC_FILES "${CMAKE_SOURCE_DIR}/glm/*.hpp" "${CMAKE_SOURCE_DIR}/glm/*.h" "${CMAKE_SOURCE_DIR}/glm/*.inl")
 install(FILES   ${INC_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/glm)
@@ -10,6 +9,6 @@ foreach(d ${dirs})
     install(FILES   ${INC_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/glm/${d})
 endforeach()
 
-## install libraries
-file(GLOB LIB_FILES "${CMAKE_BINARY_DIR}/glm/*.a")
+## install libraries (glm_static)
+file(GLOB LIB_FILES "${CMAKE_SOURCE_DIR}/ion-build/glm/*.a" "${CMAKE_SOURCE_DIR}/ion-build/glm/*.lib")
 install(FILES   ${LIB_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
