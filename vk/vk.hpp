@@ -163,13 +163,13 @@ struct Device {
 
 struct PipelineData {
     Device*                     device;
-    std::vector<VkBuffer>       uniformBuffers; /// count = MAX_FRAMES_IN_FLIGHT
+    std::vector<VkBuffer>       uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*>          uniformBuffersMapped;
     VkDescriptorSetLayout       descriptorSetLayout;
     VkPipelineLayout            pipelineLayout;
     VkPipeline                  graphicsPipeline;
-    VkVertexInputBindingDescription               binding_desc;
+    VkVertexInputBindingDescription binding_desc;
     std::vector<VkVertexInputAttributeDescription> attr_desc;
 
     std::vector<VkDescriptorSet> descriptorSets;
