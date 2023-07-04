@@ -1,4 +1,5 @@
-dep(glm:glm_static glfw:glfw3 vulkansdk:vulkan)
+# requires a system install of vulkan sdk
+dep(glm:glm_static glfw:glfw3 vulkan)
 
 if(APPLE)
     dep(IOSurface QuartzCore Metal AppKit CoreGraphics CoreFoundation Cocoa IOKit)
