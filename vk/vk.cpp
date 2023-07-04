@@ -29,11 +29,6 @@ constexpr bool is_debug() {
 #include <set>
 #include <unordered_map>
 
-const uint32_t    WIDTH         = 800;
-const uint32_t    HEIGHT        = 600;
-const std::string MODEL_PATH    = "models/viking_room.obj";
-const std::string TEXTURE_PATH  = "textures/viking_room.png";
-
 static const bool               enable_validation = is_debug();
 static VkInstance               instance = 0;
 static VkDebugUtilsMessengerEXT debugMessenger;
