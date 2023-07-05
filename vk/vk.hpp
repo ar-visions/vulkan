@@ -12,21 +12,23 @@
 
 #include <vk/stb_image.h>
 #include <vk/tiny_obj_loader.h>
+#include <mx/mx.hpp>
 
-#include <iostream>
-#include <fstream>
+//#include <iostream>
+//#include <fstream>
 #include <stdexcept>
 #include <algorithm>
 #include <chrono>
 #include <vector>
-#include <cstring>
+//#include <cstring>
 #include <cstdlib>
 #include <cstdint>
 #include <limits>
 #include <array>
 #include <optional>
 #include <set>
-#include <unordered_map>
+//#include <unordered_map>
+
 
 using vec2i  = glm::tvec2<int>;
 using cstr   = char*;
@@ -225,8 +227,8 @@ struct Pipeline:PipelineData {
         this->shader      = (cstr)shader;
         this->device      = device;
         
-        binding_desc = V::getBindingDescription();
-        attr_desc    = V::getAttributeDescriptions();
+        binding_desc = getBindingDescription();
+        attr_desc    = getAttributeDescriptions();
 
         createUniformBuffers<U>();
 
@@ -239,6 +241,55 @@ struct Pipeline:PipelineData {
         loadModel((cstr)obj); /// keeps vector in stack
 
         createDescriptorSets();
+    }
+
+    static VkVertexInputBindingDescription getBindingDescription() {
+        VkVertexInputBindingDescription bindingDescription{};
+        bindingDescription.binding = 0;
+        bindingDescription.stride = sizeof(V);
+        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return bindingDescription;
+    }
+
+    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
+        std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+        size_t        index = 0;
+        type_t       v_type = typeof(V);
+        doubly<prop> &props = v_type->schema->meta;
+        attributeDescriptions.resize(props.len());
+
+        auto get_format = [](prop &p) {
+            if (p->member_type == typeof(vec2f)) return VK_FORMAT_R32G32_SFLOAT;
+            if (p->member_type == typeof(vec3f)) return VK_FORMAT_R32G32B32_SFLOAT;
+            if (p->member_type == typeof(vec4f)) return VK_FORMAT_R32G32B32A32_SFLOAT;
+            if (p->member_type == typeof(float)) return VK_FORMAT_R32_SFLOAT;
+        };
+
+        for (prop &p: props) {
+            attributeDescriptions[index].binding  = 0;
+            attributeDescriptions[index].location = index;
+            attributeDescriptions[index].format   = get_format(p);
+            attributeDescriptions[index].offset   = p.offset;
+            index++;
+        }
+        /*
+        attributeDescriptions[0].binding = 0;
+        attributeDescriptions[0].location = 0;
+        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[0].offset = offsetof(V, pos);
+
+        attributeDescriptions[1].binding = 0;
+        attributeDescriptions[1].location = 1;
+        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        attributeDescriptions[1].offset = offsetof(V, color);
+
+        attributeDescriptions[2].binding = 0;
+        attributeDescriptions[2].location = 2;
+        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        attributeDescriptions[2].offset = offsetof(V, texCoord);
+        */
+        return attributeDescriptions;
     }
 
     void updateUniformBuffer() {

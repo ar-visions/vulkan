@@ -6,7 +6,7 @@
             "type": "shell",
             "command": "make example -j8",
             "options": {
-                "cwd": "${workspaceFolder}/../vulkan-example/build"
+                "cwd": "${workspaceFolder}/../vulkan/build"
             },
             "group": {
                 "kind": "build",

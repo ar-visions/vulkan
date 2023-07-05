@@ -5,13 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name":             "vulkan-example",
+            "name":             "example",
             "type":             "cppdbg",
             "request":          "launch",
-            "program":          "${workspaceFolder}/../vulkan-example/build/example",
+            "program":          "${workspaceFolder}/../vulkan/build/example",
             "args":             [],
             "stopAtEntry":      false,
-            "cwd":              "${workspaceFolder}/../vulkan-example/build",
+            "cwd":              "${workspaceFolder}/../vulkan/build",
             "environment":      [],
             "externalConsole":  false,
             "MIMode":           "gdb",

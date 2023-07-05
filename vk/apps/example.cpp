@@ -1,23 +1,4 @@
-
 #include <vk/vk.hpp>
-
-/*
-included from priors:
-#include <iostream>
-#include <fstream>
-#include <stdexcept>
-#include <algorithm>
-#include <chrono>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <cstdint>
-#include <limits>
-#include <array>
-#include <optional>
-#include <set>
-#include <unordered_map>
-*/
 
 constexpr bool is_debug() {
 #ifndef NDEBUG
@@ -26,7 +7,6 @@ constexpr bool is_debug() {
     return false;
 #endif
 }
-
 
 using vec2i  = glm::tvec2<int>;
 using cstr   = char*;
@@ -60,36 +40,15 @@ struct Vertex {
         color = {1.0f, 1.0f, 1.0f};
     }
 
-    static VkVertexInputBindingDescription getBindingDescription() {
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return bindingDescription;
+    doubly<prop> meta() const {
+        return {
+            prop { "pos",      pos      },
+            prop { "color",    color    }, /// must give member-parent-origin (std) to be able to 're-apply' somewhere else
+            prop { "texCoord", texCoord }
+        };
     }
 
-    static std::vector<VkVertexInputAttributeDescription> getAttributeDescriptions() {
-        std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
-        attributeDescriptions.resize(3);
-
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-        return attributeDescriptions;
-    }
+    register1(Vertex);
 
     bool operator==(const Vertex& other) const {
         return pos == other.pos && color == other.color && texCoord == other.texCoord;
