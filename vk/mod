@@ -1,4 +1,4 @@
-dep(glm:glm_static glfw:glfw3 vulkan)
+dep(mx:mx glm:glm_static glfw:glfw3 vulkan)
 
 if(APPLE)
     dep(IOSurface QuartzCore Metal AppKit CoreGraphics CoreFoundation Cocoa IOKit)

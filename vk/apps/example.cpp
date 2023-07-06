@@ -48,6 +48,8 @@ struct Vertex {
         };
     }
 
+    operator bool() { return true; }
+
     register1(Vertex);
 
     bool operator==(const Vertex& other) const {
@@ -92,7 +94,7 @@ public:
     }
 
 private:
-    GPU      *gpu;
+    GPU       gpu;
     Device   *device;
     PipelineData *pipeline;
     

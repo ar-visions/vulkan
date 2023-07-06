@@ -13,6 +13,7 @@
 #include <vk/stb_image.h>
 #include <vk/tiny_obj_loader.h>
 #include <mx/mx.hpp>
+#include <math/math.hpp>
 
 //#include <iostream>
 //#include <fstream>
@@ -29,10 +30,7 @@
 #include <set>
 //#include <unordered_map>
 
-
-using vec2i  = glm::tvec2<int>;
-using cstr   = char*;
-using symbol = const char *;
+using namespace ion;
 
 static const int MAX_FRAMES_IN_FLIGHT = 2;
 
@@ -60,13 +58,21 @@ struct SwapChainSupportDetails {
 
 struct PipelineData;
 
-struct GPU {
-    VkPhysicalDevice        phys        = VK_NULL_HANDLE;
-    VkSampleCountFlagBits   msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-    GLFWwindow*             window      = NULL;
-    VkSurfaceKHR            surface     = 0;
-    QueueFamilyIndices      indices;
-    SwapChainSupportDetails details;
+struct GPU:mx {
+    struct impl {
+        VkPhysicalDevice        phys        = VK_NULL_HANDLE;
+        VkSampleCountFlagBits   msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+        GLFWwindow*             window      = NULL;
+        VkSurfaceKHR            surface     = 0;
+        QueueFamilyIndices      indices;
+        SwapChainSupportDetails details;
+
+        uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+        void destroy();
+        operator bool() { return phys != VK_NULL_HANDLE; }
+        register1(impl);
+    };
 
     operator VkPhysicalDevice();
 
@@ -76,25 +82,23 @@ struct GPU {
     
     static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice phys, VkSurfaceKHR surface, SwapChainSupportDetails &details);
 
-    static SwapChainSupportDetails querySwapChainSupport(GPU *gpu);
+    static SwapChainSupportDetails querySwapChainSupport(GPU &gpu);
 
     static bool checkDeviceExtensionSupport(VkPhysicalDevice phys);
 
     static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice phy, VkSurfaceKHR surface);
 
-    static QueueFamilyIndices findQueueFamilies(GPU *gpu);
+    static QueueFamilyIndices findQueueFamilies(GPU &gpu);
 
     static bool isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFamilyIndices &indices, SwapChainSupportDetails &swapChainSupport);
 
-    static GPU *select(vec2i sz);
+    static GPU select(vec2i sz);
 
-    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
-
-    void destroy();
+    ptr(GPU, mx, impl);
 };
 
 struct Device {
-    GPU                        *gpu;
+    GPU                         gpu;
     VkDevice                    device;
     VkQueue                     graphicsQueue;
     VkQueue                     presentQueue;
@@ -157,7 +161,7 @@ struct Device {
     void createSwapChain();
     void createImageViews();
     void createRenderPass();
-    static Device *create(GPU *gpu);
+    static Device *create(GPU &gpu);
     void cleanupSwapChain();
     void cleanup();
 };
@@ -256,14 +260,14 @@ struct Pipeline:PipelineData {
         std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
         size_t        index = 0;
         type_t       v_type = typeof(V);
-        doubly<prop> &props = v_type->schema->meta;
-        attributeDescriptions.resize(props.len());
+        doubly<prop> &props = *(doubly<prop>*)v_type->meta;
+        attributeDescriptions.resize(props->len());
 
         auto get_format = [](prop &p) {
-            if (p->member_type == typeof(vec2f)) return VK_FORMAT_R32G32_SFLOAT;
-            if (p->member_type == typeof(vec3f)) return VK_FORMAT_R32G32B32_SFLOAT;
-            if (p->member_type == typeof(vec4f)) return VK_FORMAT_R32G32B32A32_SFLOAT;
-            if (p->member_type == typeof(float)) return VK_FORMAT_R32_SFLOAT;
+            if (p.member_type == typeof(vec2f)) return VK_FORMAT_R32G32_SFLOAT;
+            if (p.member_type == typeof(vec3f)) return VK_FORMAT_R32G32B32_SFLOAT;
+            if (p.member_type == typeof(vec4f)) return VK_FORMAT_R32G32B32A32_SFLOAT;
+            if (p.member_type == typeof(float)) return VK_FORMAT_R32_SFLOAT;
         };
 
         for (prop &p: props) {
@@ -305,7 +309,7 @@ struct Pipeline:PipelineData {
 
     void createTextureSampler() {
         VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(*device->gpu, &properties);
+        vkGetPhysicalDeviceProperties(device->gpu, &properties);
 
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;

@@ -6,14 +6,6 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <vk/tiny_obj_loader.h>
 
-constexpr bool is_debug() {
-#ifndef NDEBUG
-    return true;
-#else
-    return false;
-#endif
-}
-
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
@@ -28,6 +20,8 @@ constexpr bool is_debug() {
 #include <optional>
 #include <set>
 #include <unordered_map>
+
+using namespace ion;
 
 static const bool               enable_validation = is_debug();
 static VkInstance               instance = 0;
@@ -175,12 +169,12 @@ void vulkan_cleanup() {
 }
 
 GPU::operator VkPhysicalDevice() {
-    return phys;
+    return data->phys;
 }
 
 VkSampleCountFlagBits GPU::getUsableSampling(VkSampleCountFlagBits max) {
     VkPhysicalDeviceProperties physicalDeviceProperties;
-    vkGetPhysicalDeviceProperties(phys, &physicalDeviceProperties);
+    vkGetPhysicalDeviceProperties(data->phys, &physicalDeviceProperties);
 
     VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
     if ((max >= VK_SAMPLE_COUNT_64_BIT) && (counts & VK_SAMPLE_COUNT_64_BIT)) { return VK_SAMPLE_COUNT_64_BIT; }
@@ -222,7 +216,7 @@ SwapChainSupportDetails GPU::querySwapChainSupport(VkPhysicalDevice phys, VkSurf
     return details;
 }
 
-SwapChainSupportDetails GPU::querySwapChainSupport(GPU *gpu) {
+SwapChainSupportDetails GPU::querySwapChainSupport(GPU &gpu) {
     return querySwapChainSupport(gpu->phys, gpu->surface, gpu->details);
 }
 
@@ -271,7 +265,7 @@ QueueFamilyIndices GPU::findQueueFamilies(VkPhysicalDevice phy, VkSurfaceKHR sur
     return indices;
 }
 
-QueueFamilyIndices GPU::findQueueFamilies(GPU *gpu) {
+QueueFamilyIndices GPU::findQueueFamilies(GPU &gpu) {
     return findQueueFamilies(gpu->phys, gpu->surface);
 }
 
@@ -290,8 +284,8 @@ bool GPU::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFam
     return indices.isComplete() && extensionsSupported && swapChainAdequate  && supportedFeatures.samplerAnisotropy;
 }
 
-GPU *GPU::select(vec2i sz) {
-    GPU *g = new GPU();
+GPU GPU::select(vec2i sz) {
+    GPU g = GPU();
 
     g->window = initWindow(sz);
     vulkan_init();
@@ -313,7 +307,7 @@ GPU *GPU::select(vec2i sz) {
         g->indices = findQueueFamilies(phys, g->surface);
         if (isDeviceSuitable(phys, g->surface, g->indices, g->details)) {
             g->phys        = phys;
-            g->msaaSamples = g->getUsableSampling(VK_SAMPLE_COUNT_8_BIT);
+            g->msaaSamples = g.getUsableSampling(VK_SAMPLE_COUNT_8_BIT);
             break;
         }
     }
@@ -324,7 +318,7 @@ GPU *GPU::select(vec2i sz) {
     return g;
 }
 
-uint32_t GPU::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+uint32_t GPU::impl::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(phys, &memProperties);
 
@@ -338,7 +332,7 @@ uint32_t GPU::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properti
     return 0;
 }
 
-void GPU::destroy() {
+void GPU::impl::destroy() {
     vkDestroySurfaceKHR(instance, surface, nullptr);
     glfwDestroyWindow(window);
 }
@@ -543,7 +537,7 @@ void Device::createDepthResources() {
 VkFormat Device::findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features) {
     for (VkFormat format : candidates) {
         VkFormatProperties props;
-        vkGetPhysicalDeviceFormatProperties(*gpu, format, &props);
+        vkGetPhysicalDeviceFormatProperties(gpu, format, &props);
 
         if (tiling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features) {
             return format;
@@ -570,7 +564,7 @@ bool Device::hasStencilComponent(VkFormat format) {
 void Device::generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels) {
     // Check if image format supports linear blitting
     VkFormatProperties formatProperties;
-    vkGetPhysicalDeviceFormatProperties(*gpu, imageFormat, &formatProperties);
+    vkGetPhysicalDeviceFormatProperties(gpu, imageFormat, &formatProperties);
 
     if (!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
         throw std::runtime_error("texture image format does not support linear blitting!");
@@ -995,7 +989,7 @@ void Device::createRenderPass() {
     }
 }
 
-Device *Device::create(GPU *gpu) {
+Device *Device::create(GPU &gpu) {
     Device *dev = new Device();
     dev->gpu = gpu;
     dev->createLogicalDevice();
