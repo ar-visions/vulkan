@@ -95,7 +95,7 @@ public:
 
 private:
     GPU       gpu;
-    Device   *device;
+    Device    device;
     PipelineData *pipeline;
     
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
@@ -122,7 +122,7 @@ private:
             device->drawFrame(pipeline);
         }
 
-        vkDeviceWaitIdle(*device);
+        vkDeviceWaitIdle(device);
     }
 
     void cleanup() {

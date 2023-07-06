@@ -97,78 +97,83 @@ struct GPU:mx {
     ptr(GPU, mx, impl);
 };
 
-struct Device {
-    GPU                         gpu;
-    VkDevice                    device;
-    VkQueue                     graphicsQueue;
-    VkQueue                     presentQueue;
+struct Device:mx {
+    struct impl {
+        GPU                         gpu;
+        VkDevice                    device;
+        VkQueue                     graphicsQueue;
+        VkQueue                     presentQueue;
 
-    VkSwapchainKHR              swapChain;
-    std::vector<VkImage>        swapChainImages;
-    VkFormat                    swapChainImageFormat;
-    VkExtent2D                  swapChainExtent;
-    std::vector<VkImageView>    swapChainImageViews;
-    std::vector<VkFramebuffer>  swapChainFramebuffers;
-    VkRenderPass                renderPass;
-    VkDescriptorPool            descriptorPool;
+        VkSwapchainKHR              swapChain;
+        std::vector<VkImage>        swapChainImages;
+        VkFormat                    swapChainImageFormat;
+        VkExtent2D                  swapChainExtent;
+        std::vector<VkImageView>    swapChainImageViews;
+        std::vector<VkFramebuffer>  swapChainFramebuffers;
+        VkRenderPass                renderPass;
+        VkDescriptorPool            descriptorPool;
 
-    VkCommandPool               commandPool;
-    VkImage                     colorImage;
-    VkDeviceMemory              colorImageMemory;
-    VkImageView                 colorImageView;
-    VkImage                     depthImage;
-    VkDeviceMemory              depthImageMemory;
-    VkImageView                 depthImageView;
+        VkCommandPool               commandPool;
+        VkImage                     colorImage;
+        VkDeviceMemory              colorImageMemory;
+        VkImageView                 colorImageView;
+        VkImage                     depthImage;
+        VkDeviceMemory              depthImageMemory;
+        VkImageView                 depthImageView;
 
-    bool                        framebufferResized;
+        bool                        framebufferResized;
 
-    uint32_t                    mipLevels;
+        uint32_t                    mipLevels;
 
-    std::vector<VkCommandBuffer> commandBuffers;
+        std::vector<VkCommandBuffer> commandBuffers;
 
-    std::vector<VkSemaphore>    imageAvailableSemaphores;
-    std::vector<VkSemaphore>    renderFinishedSemaphores;
-    std::vector<VkFence>        inFlightFences;
-    uint32_t                    currentFrame = 0;
+        std::vector<VkSemaphore>    imageAvailableSemaphores;
+        std::vector<VkSemaphore>    renderFinishedSemaphores;
+        std::vector<VkFence>        inFlightFences;
+        uint32_t                    currentFrame = 0;
 
+        void drawFrame(PipelineData *pipeline);
+        void recreateSwapChain();
+        void createDescriptorPool();
+        void createFramebuffers();
+        void createSyncObjects();
+        void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+        VkCommandBuffer beginSingleTimeCommands();
+        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+        void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+        void createCommandBuffers();
+        void createCommandPool();
+        void createColorResources();
+        void createDepthResources();
+        VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+        VkFormat findDepthFormat();
+        bool hasStencilComponent(VkFormat format);
+        void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
+        VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
+        void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+        void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
+        void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+        VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
+        VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
+        VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
+        void createLogicalDevice();
+        void createSwapChain();
+        void createImageViews();
+        void createRenderPass();
+        void cleanupSwapChain();
+        void cleanup();
+        operator bool() { return device != VK_NULL_HANDLE; }
+        register1(impl);
+    };
+
+    static Device create(GPU &gpu);
     operator VkDevice();
-
-    void drawFrame(PipelineData *pipeline);
-    void recreateSwapChain();
-    void createDescriptorPool();
-    void createFramebuffers();
-    void createSyncObjects();
-    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-    VkCommandBuffer beginSingleTimeCommands();
-    void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    void createCommandBuffers();
-    void createCommandPool();
-    void createColorResources();
-    void createDepthResources();
-    VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
-    VkFormat findDepthFormat();
-    bool hasStencilComponent(VkFormat format);
-    void generateMipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth, int32_t texHeight, uint32_t mipLevels);
-    VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags, uint32_t mipLevels);
-    void createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
-    void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels);
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats);
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes);
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
-    void createLogicalDevice();
-    void createSwapChain();
-    void createImageViews();
-    void createRenderPass();
-    static Device *create(GPU &gpu);
-    void cleanupSwapChain();
-    void cleanup();
+    ptr(Device, mx, impl);
 };
 
 
 struct PipelineData {
-    Device*                     device;
+    Device                      device;
     std::vector<VkBuffer>       uniformBuffers;
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     std::vector<void*>          uniformBuffersMapped;
@@ -215,7 +220,7 @@ struct PipelineData {
 
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-            vkMapMemory(*device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+            vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
         }
     }
 
@@ -225,7 +230,7 @@ struct PipelineData {
 /// this 'constructs' a PipelineData which is a struct that holds the pipeline info
 template <typename U, typename V>
 struct Pipeline:PipelineData {
-    Pipeline(Device *device, symbol shader, symbol obj, symbol texture):PipelineData() {
+    Pipeline(Device device, symbol shader, symbol obj, symbol texture):PipelineData() {
         this->uniformSize = sizeof(U);
         this->vertexSize  = sizeof(V);
         this->shader      = (cstr)shader;
@@ -329,7 +334,7 @@ struct Pipeline:PipelineData {
         samplerInfo.maxLod = static_cast<float>(device->mipLevels);
         samplerInfo.mipLodBias = 0.0f;
 
-        if (vkCreateSampler(*device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+        if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
             throw std::runtime_error("failed to create texture sampler!");
         }
     }
@@ -378,16 +383,16 @@ struct Pipeline:PipelineData {
         device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
         void* data;
-        vkMapMemory(*device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
             memcpy(data, vertices.data(), (size_t) bufferSize);
-        vkUnmapMemory(*device, stagingBufferMemory);
+        vkUnmapMemory(device, stagingBufferMemory);
 
         device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
 
         device->copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
-        vkDestroyBuffer(*device, stagingBuffer, nullptr);
-        vkFreeMemory(*device, stagingBufferMemory, nullptr);
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
     void createIndexBuffer(std::vector<uint32_t> &indices) {
@@ -398,14 +403,14 @@ struct Pipeline:PipelineData {
         device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
         
         void* data;
-        vkMapMemory(*device, stagingBufferMemory, 0, bufferSize, 0, &data);
+        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
             memcpy(data, indices.data(), (size_t) bufferSize);
-        vkUnmapMemory(*device, stagingBufferMemory);
+        vkUnmapMemory(device, stagingBufferMemory);
         
         device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
         device->copyBuffer(stagingBuffer, indexBuffer, bufferSize);
-        vkDestroyBuffer(*device, stagingBuffer, nullptr);
-        vkFreeMemory(*device, stagingBufferMemory, nullptr);
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
     }
 
     void createDescriptorSetLayout() {
@@ -429,7 +434,7 @@ struct Pipeline:PipelineData {
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(*device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
     }
@@ -449,9 +454,9 @@ struct Pipeline:PipelineData {
         device->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
         void* data;
-        vkMapMemory(*device, stagingBufferMemory, 0, imageSize, 0, &data);
+        vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
             memcpy(data, pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(*device, stagingBufferMemory);
+        vkUnmapMemory(device, stagingBufferMemory);
 
         stbi_image_free(pixels);
 
@@ -461,8 +466,8 @@ struct Pipeline:PipelineData {
         device->copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
         //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
 
-        vkDestroyBuffer(*device, stagingBuffer, nullptr);
-        vkFreeMemory(*device, stagingBufferMemory, nullptr);
+        vkDestroyBuffer(device, stagingBuffer, nullptr);
+        vkFreeMemory(device, stagingBufferMemory, nullptr);
 
         device->generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, device->mipLevels);
     }
