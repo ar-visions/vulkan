@@ -30,10 +30,9 @@
 #include <set>
 //#include <unordered_map>
 
-using namespace ion;
+namespace ion {
 
 static const int MAX_FRAMES_IN_FLIGHT = 2;
-
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
@@ -44,11 +43,26 @@ struct QueueFamilyIndices {
     }
 };
 
-std::vector<const char*> getRequiredExtensions();
+struct Vulkan:mx {
+    struct impl {
+        int v_major = 1;
+        int v_minor = 0;
+        void init();
+        ~impl();
+        bool check_validation();
+        std::vector<symbol> getRequiredExtensions();
+        operator bool();
+        register(impl);
+    };
+    ptr_declare(Vulkan, mx, impl);
+    /// need not construct unless we want a specific version other than 1.0
+    Vulkan(int v_major, int v_minor):Vulkan() {
+        data->v_major = v_major;
+        data->v_minor = v_minor;
+    }
+};
 
-void vulkan_init();
-bool vulkan_check_validation();
-void vulkan_cleanup();
+template <> struct is_singleton<Vulkan::impl> : true_type { };
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR        capabilities = {};
@@ -69,9 +83,9 @@ struct GPU:mx {
 
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
-        void destroy();
+        ~impl();
         operator bool() { return phys != VK_NULL_HANDLE; }
-        register1(impl);
+        register(impl);
     };
 
     operator VkPhysicalDevice();
@@ -103,7 +117,6 @@ struct Device:mx {
         VkDevice                    device;
         VkQueue                     graphicsQueue;
         VkQueue                     presentQueue;
-
         VkSwapchainKHR              swapChain;
         std::vector<VkImage>        swapChainImages;
         VkFormat                    swapChainImageFormat;
@@ -112,7 +125,6 @@ struct Device:mx {
         std::vector<VkFramebuffer>  swapChainFramebuffers;
         VkRenderPass                renderPass;
         VkDescriptorPool            descriptorPool;
-
         VkCommandPool               commandPool;
         VkImage                     colorImage;
         VkDeviceMemory              colorImageMemory;
@@ -120,9 +132,7 @@ struct Device:mx {
         VkImage                     depthImage;
         VkDeviceMemory              depthImageMemory;
         VkImageView                 depthImageView;
-
         bool                        framebufferResized;
-
         uint32_t                    mipLevels;
 
         std::vector<VkCommandBuffer> commandBuffers;
@@ -132,7 +142,7 @@ struct Device:mx {
         std::vector<VkFence>        inFlightFences;
         uint32_t                    currentFrame = 0;
 
-        void drawFrame(PipelineData *pipeline);
+        void drawFrame(PipelineData &pipeline);
         void recreateSwapChain();
         void createDescriptorPool();
         void createFramebuffers();
@@ -161,9 +171,9 @@ struct Device:mx {
         void createImageViews();
         void createRenderPass();
         void cleanupSwapChain();
-        void cleanup();
+        ~impl();
         operator bool() { return device != VK_NULL_HANDLE; }
-        register1(impl);
+        register(impl);
     };
 
     static Device create(GPU &gpu);
@@ -172,84 +182,91 @@ struct Device:mx {
 };
 
 
-struct PipelineData {
-    Device                      device;
-    std::vector<VkBuffer>       uniformBuffers;
-    std::vector<VkDeviceMemory> uniformBuffersMemory;
-    std::vector<void*>          uniformBuffersMapped;
-    VkDescriptorSetLayout       descriptorSetLayout;
-    VkPipelineLayout            pipelineLayout;
-    VkPipeline                  graphicsPipeline;
-    VkVertexInputBindingDescription binding_desc;
-    std::vector<VkVertexInputAttributeDescription> attr_desc;
+struct PipelineData:mx {
+    struct impl {
+        Device                      device;
+        std::vector<VkBuffer>       uniformBuffers;
+        std::vector<VkDeviceMemory> uniformBuffersMemory;
+        std::vector<void*>          uniformBuffersMapped;
+        VkDescriptorSetLayout       descriptorSetLayout;
+        VkPipelineLayout            pipelineLayout;
+        VkPipeline                  graphicsPipeline;
+        VkVertexInputBindingDescription binding_desc;
+        std::vector<VkVertexInputAttributeDescription> attr_desc;
 
-    std::vector<VkDescriptorSet> descriptorSets;
-    VkBuffer                    vertexBuffer;
-    VkDeviceMemory              vertexBufferMemory;
-    VkBuffer                    indexBuffer;
-    VkDeviceMemory              indexBufferMemory;
-    size_t                      uniformSize;
-    size_t                      vertexSize;
-    cstr                        shader;
-    size_t                      indicesSize;
+        std::vector<VkDescriptorSet> descriptorSets;
+        VkBuffer                    vertexBuffer;
+        VkDeviceMemory              vertexBufferMemory;
+        VkBuffer                    indexBuffer;
+        VkDeviceMemory              indexBufferMemory;
+        size_t                      uniformSize;
+        size_t                      vertexSize;
+        cstr                        shader;
+        size_t                      indicesSize;
 
-    VkImage                     textureImage;
-    VkDeviceMemory              textureImageMemory;
-    VkImageView                 textureImageView;
-    VkSampler                   textureSampler;
+        VkImage                     textureImage;
+        VkDeviceMemory              textureImageMemory;
+        VkImageView                 textureImageView;
+        VkSampler                   textureSampler;
 
-    void cleanup();
+        ~impl();
 
-    static std::vector<char> readFile(symbol filename);
+        static std::vector<char> readFile(symbol filename);
 
-    VkShaderModule createShaderModule(const std::vector<char>& code);
+        VkShaderModule createShaderModule(const std::vector<char>& code);
 
-    void createGraphicsPipeline();
+        void createGraphicsPipeline();
 
-    void createDescriptorSets();
+        void createDescriptorSets();
+
+        template <typename T>
+        void createUniformBuffers() {
+            VkDeviceSize bufferSize = sizeof(T); /// was UniformBufferObject
+
+            uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+            uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+            uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+            for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+                device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
+                vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
+            }
+        }
+
+        void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+        operator bool() { return graphicsPipeline != VK_NULL_HANDLE; }
+        register(impl);
+    };
 
     virtual void updateUniformBuffer();
 
-    template <typename T>
-    void createUniformBuffers() {
-        VkDeviceSize bufferSize = sizeof(T); /// was UniformBufferObject
-
-        uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-        uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
-        uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
-
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniformBuffers[i], uniformBuffersMemory[i]);
-            vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0, &uniformBuffersMapped[i]);
-        }
-    }
-
-    virtual void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
+    ptr(PipelineData, mx, impl);
 };
 
 /// this 'constructs' a PipelineData which is a struct that holds the pipeline info
 template <typename U, typename V>
 struct Pipeline:PipelineData {
+    Pipeline():PipelineData() { }
     Pipeline(Device device, symbol shader, symbol obj, symbol texture):PipelineData() {
-        this->uniformSize = sizeof(U);
-        this->vertexSize  = sizeof(V);
-        this->shader      = (cstr)shader;
-        this->device      = device;
+        data->uniformSize = sizeof(U);
+        data->vertexSize  = sizeof(V);
+        data->shader      = (cstr)shader;
+        data->device      = device;
         
-        binding_desc = getBindingDescription();
-        attr_desc    = getAttributeDescriptions();
+        data->binding_desc = getBindingDescription();
+        data->attr_desc    = getAttributeDescriptions();
 
-        createUniformBuffers<U>();
+        data->createUniformBuffers<U>();
 
         createDescriptorSetLayout();
-        createGraphicsPipeline();
+        data->createGraphicsPipeline();
         createTextureImage((cstr)texture);
         createTextureImageView();
         createTextureSampler();
 
         loadModel((cstr)obj); /// keeps vector in stack
 
-        createDescriptorSets();
+        data->createDescriptorSets();
     }
 
     static VkVertexInputBindingDescription getBindingDescription() {
@@ -303,18 +320,18 @@ struct Pipeline:PipelineData {
 
     void updateUniformBuffer() {
         U ubo {};
-        ubo.update(this);
-        memcpy(uniformBuffersMapped[device->currentFrame], &ubo, sizeof(ubo));
+        ubo.update(*this);
+        memcpy(data->uniformBuffersMapped[data->device->currentFrame], &ubo, sizeof(ubo));
     }
 
     void createTextureImageView() {
-        textureImageView = device->createImageView(
-            textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, device->mipLevels);
+        data->textureImageView = data->device->createImageView(
+            data->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, data->device->mipLevels);
     }
 
     void createTextureSampler() {
         VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(device->gpu, &properties);
+        vkGetPhysicalDeviceProperties(data->device->gpu, &properties);
 
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -331,10 +348,10 @@ struct Pipeline:PipelineData {
         samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
         samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
         samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = static_cast<float>(device->mipLevels);
+        samplerInfo.maxLod = static_cast<float>(data->device->mipLevels);
         samplerInfo.mipLodBias = 0.0f;
 
-        if (vkCreateSampler(device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+        if (vkCreateSampler(data->device, &samplerInfo, nullptr, &data->textureSampler) != VK_SUCCESS) {
             throw std::runtime_error("failed to create texture sampler!");
         }
     }
@@ -351,7 +368,7 @@ struct Pipeline:PipelineData {
 
         std::vector<V> vertices(attrib.vertices.size());
         std::vector<bool> emitted(attrib.vertices.size());
-        std::vector<uint32_t> indices (indicesSize);
+        std::vector<uint32_t> indices (data->indicesSize);
 
         size_t cur = 0;
 
@@ -369,7 +386,7 @@ struct Pipeline:PipelineData {
                 indices.push_back(uniqueVertices[vertex]);
             }
         }
-        indicesSize = indices.size();
+        data->indicesSize = indices.size();
 
         createVertexBuffer(vertices);
         createIndexBuffer(indices);
@@ -380,19 +397,20 @@ struct Pipeline:PipelineData {
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        data->device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, vertices.data(), (size_t) bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
+        void* vdata;
+        vkMapMemory(data->device, stagingBufferMemory, 0, bufferSize, 0, &vdata);
+            memcpy(vdata, vertices.data(), (size_t) bufferSize);
+        vkUnmapMemory(data->device, stagingBufferMemory);
 
-        device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
+        data->device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, data->vertexBuffer, data->vertexBufferMemory);
 
-        device->copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+        data->device->copyBuffer(stagingBuffer, data->vertexBuffer, bufferSize);
 
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
+        vkDestroyBuffer(data->device, stagingBuffer, nullptr);
+        vkFreeMemory(data->device, stagingBufferMemory, nullptr);
     }
 
     void createIndexBuffer(std::vector<uint32_t> &indices) {
@@ -400,17 +418,18 @@ struct Pipeline:PipelineData {
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
 
-        device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        data->device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
         
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
-            memcpy(data, indices.data(), (size_t) bufferSize);
-        vkUnmapMemory(device, stagingBufferMemory);
+        void* vdata;
+        vkMapMemory(data->device, stagingBufferMemory, 0, bufferSize, 0, &vdata);
+            memcpy(vdata, indices.data(), (size_t) bufferSize);
+        vkUnmapMemory(data->device, stagingBufferMemory);
         
-        device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
-        device->copyBuffer(stagingBuffer, indexBuffer, bufferSize);
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
+        data->device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            data->indexBuffer, data->indexBufferMemory);
+        data->device->copyBuffer(stagingBuffer, data->indexBuffer, bufferSize);
+        vkDestroyBuffer(data->device, stagingBuffer, nullptr);
+        vkFreeMemory(data->device, stagingBufferMemory, nullptr);
     }
 
     void createDescriptorSetLayout() {
@@ -434,7 +453,7 @@ struct Pipeline:PipelineData {
         layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
         layoutInfo.pBindings = bindings.data();
 
-        if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        if (vkCreateDescriptorSetLayout(data->device, &layoutInfo, nullptr, &data->descriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
     }
@@ -443,7 +462,7 @@ struct Pipeline:PipelineData {
         int texWidth, texHeight, texChannels;
         stbi_uc* pixels = stbi_load((symbol)texture_path, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
         VkDeviceSize imageSize = texWidth * texHeight * 4;
-        device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+        data->device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
 
         if (!pixels) {
             throw std::runtime_error("failed to load texture image!");
@@ -451,24 +470,30 @@ struct Pipeline:PipelineData {
 
         VkBuffer stagingBuffer;
         VkDeviceMemory stagingBufferMemory;
-        device->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+        data->device->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
 
-        void* data;
-        vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &data);
-            memcpy(data, pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(device, stagingBufferMemory);
+        void* vdata;
+        vkMapMemory(data->device, stagingBufferMemory, 0, imageSize, 0, &vdata);
+            memcpy(vdata, pixels, static_cast<size_t>(imageSize));
+        vkUnmapMemory(data->device, stagingBufferMemory);
 
         stbi_image_free(pixels);
 
-        device->createImage(texWidth, texHeight, device->mipLevels, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
+        data->device->createImage(texWidth, texHeight, data->device->mipLevels,
+            VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            data->textureImage, data->textureImageMemory);
 
-        device->transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, device->mipLevels);
-        device->copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+        data->device->transitionImageLayout(data->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            data->device->mipLevels);
+        data->device->copyBufferToImage(stagingBuffer, data->textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
         //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
 
-        vkDestroyBuffer(device, stagingBuffer, nullptr);
-        vkFreeMemory(device, stagingBufferMemory, nullptr);
+        vkDestroyBuffer(data->device, stagingBuffer, nullptr);
+        vkFreeMemory(data->device, stagingBufferMemory, nullptr);
 
-        device->generateMipmaps(textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, device->mipLevels);
+        data->device->generateMipmaps(data->textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, data->device->mipLevels);
     }
 };
+
+}

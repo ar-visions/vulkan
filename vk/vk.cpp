@@ -27,11 +27,11 @@ static const bool               enable_validation = is_debug();
 static VkInstance               instance = 0;
 static VkDebugUtilsMessengerEXT debugMessenger;
 
-const std::vector<const char*> validationLayers = {
+const std::vector<symbol> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<const char*> deviceExtensions = {
+const std::vector<symbol> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     "VK_KHR_portability_subset"
 };
@@ -51,12 +51,12 @@ void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& create
     createInfo.pfnUserCallback  = debugCallback;
 }
 
-std::vector<const char*> getRequiredExtensions() {
+std::vector<symbol> Vulkan::impl::getRequiredExtensions() {
     uint32_t glfwExtensionCount = 0;
     const char** glfwExtensions;
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-    std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    std::vector<symbol> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
     #ifdef __APPLE__
     extensions.push_back("VK_KHR_portability_enumeration");
     extensions.push_back("VK_KHR_get_physical_device_properties2");
@@ -68,7 +68,9 @@ std::vector<const char*> getRequiredExtensions() {
     return extensions;
 }
 
-bool vulkan_check_validation() {
+ptr_implement(Vulkan, mx);
+
+bool Vulkan::impl::check_validation() {
     uint32_t layerCount;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
 
@@ -109,12 +111,12 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
-void vulkan_init() {
+void Vulkan::impl::init() {
     static bool init = false;
     if (init) return;
     init = true;
 
-    if (enable_validation && !vulkan_check_validation()) {
+    if (enable_validation && !check_validation()) {
         throw std::runtime_error("validation layers requested, but not available!");
     }
 
@@ -124,7 +126,7 @@ void vulkan_init() {
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName        = "ion:cgi";
     appInfo.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion         = VK_API_VERSION_1_0;
+    appInfo.apiVersion         = VK_MAKE_VERSION(v_major, v_minor, 0);
 
     VkInstanceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -160,7 +162,11 @@ void vulkan_init() {
     }
 }
 
-void vulkan_cleanup() {
+Vulkan::impl::operator bool() {
+    return instance != VK_NULL_HANDLE;
+}
+
+Vulkan::impl::~impl() {
     if (enable_validation) {
         DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }
@@ -288,8 +294,10 @@ GPU GPU::select(vec2i sz) {
     GPU g = GPU();
 
     g->window = initWindow(sz);
-    vulkan_init();
-    
+
+    Vulkan vk; /// singleton; if constructed prior with a version, that remains set
+    vk->init();
+
     if (glfwCreateWindowSurface(instance, g->window, nullptr, &g->surface) != VK_SUCCESS) {
         throw std::runtime_error("failed to create window surface!");
     }
@@ -332,12 +340,10 @@ uint32_t GPU::impl::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pr
     return 0;
 }
 
-void GPU::impl::destroy() {
+GPU::impl::~impl() {
     vkDestroySurfaceKHR(instance, surface, nullptr);
     glfwDestroyWindow(window);
 }
-
-struct PipelineData;
 
 Device::operator VkDevice() { return data->device; }
 
@@ -350,7 +356,6 @@ void Device::impl::recreateSwapChain() {
     }
 
     vkDeviceWaitIdle(device);
-
     cleanupSwapChain();
 
     createSwapChain();
@@ -1026,8 +1031,7 @@ void Device::impl::cleanupSwapChain() {
     vkDestroySwapchainKHR(device, swapChain, nullptr);
 }
 
-void Device::impl::cleanup() {
-
+Device::impl::~impl() {
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
@@ -1044,7 +1048,7 @@ void Device::impl::cleanup() {
 }
 
 
-void PipelineData::cleanup() {
+PipelineData::impl::~impl() {
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -1069,7 +1073,7 @@ void PipelineData::cleanup() {
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 }
 
-std::vector<char> PipelineData::readFile(symbol filename) {
+std::vector<char> PipelineData::impl::readFile(symbol filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
     if (!file.is_open()) {
@@ -1087,7 +1091,7 @@ std::vector<char> PipelineData::readFile(symbol filename) {
     return buffer;
 }
 
-VkShaderModule PipelineData::createShaderModule(const std::vector<char>& code) {
+VkShaderModule PipelineData::impl::createShaderModule(const std::vector<char>& code) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size();
@@ -1101,7 +1105,7 @@ VkShaderModule PipelineData::createShaderModule(const std::vector<char>& code) {
     return shaderModule;
 }
 
-void PipelineData::createGraphicsPipeline() {
+void PipelineData::impl::createGraphicsPipeline() {
     char vert[64];
     char frag[64];
     snprintf(vert, sizeof(vert), "shaders/%s.vert.spv", shader);
@@ -1227,7 +1231,7 @@ void PipelineData::createGraphicsPipeline() {
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
-void PipelineData::createDescriptorSets() {
+void PipelineData::impl::createDescriptorSets() {
     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1251,23 +1255,23 @@ void PipelineData::createDescriptorSets() {
         imageInfo.imageView = textureImageView;
         imageInfo.sampler = textureSampler;
 
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites { };
 
-        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[0].dstSet = descriptorSets[i];
-        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet          = descriptorSets[i];
+        descriptorWrites[0].dstBinding      = 0;
         descriptorWrites[0].dstArrayElement = 0;
-        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptorWrites[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         descriptorWrites[0].descriptorCount = 1;
-        descriptorWrites[0].pBufferInfo = &bufferInfo;
+        descriptorWrites[0].pBufferInfo     = &bufferInfo;
 
-        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet = descriptorSets[i];
-        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet          = descriptorSets[i];
+        descriptorWrites[1].dstBinding      = 1;
         descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        descriptorWrites[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo = &imageInfo;
+        descriptorWrites[1].pImageInfo      = &imageInfo;
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
@@ -1275,7 +1279,7 @@ void PipelineData::createDescriptorSets() {
 
 void PipelineData::updateUniformBuffer() { }
 
-void PipelineData::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+void PipelineData::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -1333,7 +1337,7 @@ void PipelineData::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t i
 }
 
 
-void Device::impl::drawFrame(PipelineData *pipeline) {
+void Device::impl::drawFrame(PipelineData &pipeline) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -1346,7 +1350,7 @@ void Device::impl::drawFrame(PipelineData *pipeline) {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    pipeline->updateUniformBuffer();
+    pipeline.updateUniformBuffer();
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
 

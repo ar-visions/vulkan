@@ -1,16 +1,6 @@
 #include <vk/vk.hpp>
 
-constexpr bool is_debug() {
-#ifndef NDEBUG
-    return true;
-#else
-    return false;
-#endif
-}
-
-using vec2i  = glm::tvec2<int>;
-using cstr   = char*;
-using symbol = const char *;
+using namespace ion;
 
 const uint32_t    WIDTH         = 800;
 const uint32_t    HEIGHT        = 600;
@@ -24,33 +14,23 @@ struct Vertex {
 
     Vertex() { }
 
-    /// load from obj (constructed for each vertex)
-    Vertex(float *vertices, int vertex_index, float *uv, int uv_index) {
-        pos = {
-            vertices[3 * vertex_index + 0],
-            vertices[3 * vertex_index + 1],
-            vertices[3 * vertex_index + 2]
-        };
-
-        texCoord = {
-                   uv[2 * uv_index + 0],
-            1.0f - uv[2 * uv_index + 1]
-        };
-
-        color = {1.0f, 1.0f, 1.0f};
+    Vertex(float *vpos, int p_index, float *uv, int uv_index) {
+        pos      = { vpos[3 * p_index  + 0], vpos[3 * p_index + 1], vpos[3 * p_index + 2] };
+        texCoord = {   uv[2 * uv_index + 0], 1.0f - uv[2 * uv_index + 1] };
+        color    = { 1.0f, 1.0f, 1.0f };
     }
 
     doubly<prop> meta() const {
         return {
             prop { "pos",      pos      },
-            prop { "color",    color    }, /// must give member-parent-origin (std) to be able to 're-apply' somewhere else
+            prop { "color",    color    },
             prop { "texCoord", texCoord }
         };
     }
 
-    operator bool() { return true; }
+    operator bool() { return true; } /// needs to be optional, but the design-time check doesnt seem to work
 
-    register1(Vertex);
+    register(Vertex);
 
     bool operator==(const Vertex& other) const {
         return pos == other.pos && color == other.color && texCoord == other.texCoord;
@@ -70,7 +50,7 @@ struct UniformBufferObject {
     alignas(16) glm::mat4 view;
     alignas(16) glm::mat4 proj;
 
-    void update(PipelineData *pipeline) {
+    void update(PipelineData &pipeline) {
         VkExtent2D &ext = pipeline->device->swapChainExtent;
 
         static auto startTime   = std::chrono::high_resolution_clock::now();
@@ -84,65 +64,56 @@ struct UniformBufferObject {
     }
 };
 
-class HelloTriangleApplication {
-public:
-    void run() {
-        //initWindow();
-        initVulkan();
-        mainLoop();
-        cleanup();
-    }
+struct HelloTriangleApplication:mx {
+    struct impl {
+        Vulkan    vk { 1, 0 };
+        vec2i     sz;
+        GPU       gpu;
+        Device    device;
+        Pipeline<UniformBufferObject, Vertex> pipeline;
 
-private:
-    GPU       gpu;
-    Device    device;
-    PipelineData *pipeline;
-    
-    static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
-        app->device->framebufferResized = true;
-    }
-
-    void initVulkan() {
-        //createInstance(); weird: you need to pick a gpu (With Vulkan) before you initialize vulkan.
-        gpu = GPU::select({ WIDTH, HEIGHT });
-        glfwSetWindowUserPointer(gpu->window, this);
-        glfwSetFramebufferSizeCallback(gpu->window, framebufferResizeCallback);
-        
-        vulkan_init();
-
-        device = Device::create(gpu);
-
-        pipeline = new Pipeline<UniformBufferObject, Vertex>(device, "generic", MODEL_PATH.c_str(), TEXTURE_PATH.c_str());
-    }
-
-    void mainLoop() {
-        while (!glfwWindowShouldClose(gpu->window)) {
-            glfwPollEvents();
-            device->drawFrame(pipeline);
+        static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+            auto *i = (HelloTriangleApplication::impl*)(glfwGetWindowUserPointer(window));
+            i->device->framebufferResized = true;
         }
 
-        vkDeviceWaitIdle(device);
+        void init(vec2i &sz) {
+            gpu = GPU::select(sz);
+            glfwSetWindowUserPointer(gpu->window, this);
+            glfwSetFramebufferSizeCallback(gpu->window, framebufferResizeCallback);
+            device = Device::create(gpu);
+            pipeline = Pipeline<UniformBufferObject, Vertex>(device, "generic", MODEL_PATH.c_str(), TEXTURE_PATH.c_str());
+        }
+
+        void run() {
+            while (!glfwWindowShouldClose(gpu->window)) {
+                glfwPollEvents();
+                device->drawFrame(pipeline);
+            }
+            vkDeviceWaitIdle(device);
+        }
+        operator bool() { return sz.x > 0; }
+        register(impl);
+    };
+    
+    ptr(HelloTriangleApplication, mx, impl);
+
+    HelloTriangleApplication(vec2i sz):HelloTriangleApplication() {
+        data->init(sz);
     }
 
-    void cleanup() {
-        pipeline->cleanup();
-        device->cleanup();
-        gpu->destroy();
-
-        vulkan_cleanup();
+    /// return the class in main() to loop and return code
+    operator int() {
+        try {
+            data->run();
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
     }
 };
 
 int main() {
-    HelloTriangleApplication app;
-
-    try {
-        app.run();
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
+    return HelloTriangleApplication({ WIDTH, HEIGHT });
 }
