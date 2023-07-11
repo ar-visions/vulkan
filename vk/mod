@@ -1,7 +1,7 @@
 dep(mx:mx glm:glm_static glfw:glfw3 vulkan)
 
-if(APPLE)
+if(mac)
     dep(IOSurface QuartzCore Metal AppKit CoreGraphics CoreFoundation Cocoa IOKit)
-else()
+elseif(linux)
     dep(X11)
 endif()

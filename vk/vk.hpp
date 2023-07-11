@@ -33,6 +33,7 @@
 namespace ion {
 
 static const int MAX_FRAMES_IN_FLIGHT = 2;
+static const int MAX_PBR_LIGHTS       = 3;
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
@@ -55,6 +56,7 @@ struct Vulkan:mx {
         register(impl);
     };
     ptr_declare(Vulkan, mx, impl);
+
     /// need not construct unless we want a specific version other than 1.0
     Vulkan(int v_major, int v_minor):Vulkan() {
         data->v_major = v_major;
@@ -181,6 +183,30 @@ struct Device:mx {
     ptr(Device, mx, impl);
 };
 
+enums(Asset, undefined, "undefined, color, normal, material", undefined, color, normal, material);
+
+struct Texture:mx {
+    struct impl {
+        Device          device;
+        VkImage         image;
+        VkDeviceMemory  memory;
+        VkImageView     view;
+        VkSampler       sampler;
+        int             width;
+        int             height;
+        ion::path       path;
+        Asset           asset_type;
+
+        void create_image_view();
+        void create_sampler();
+        void create_image(ion::path texture_path, Asset type);
+        ~impl();
+        operator bool() { return image != VK_NULL_HANDLE; }
+        register(impl);
+    };
+    ptr(Texture, mx, impl);
+    static Texture load(Device &dev, symbol name, Asset type);
+};
 
 struct PipelineData:mx {
     struct impl {
@@ -204,10 +230,14 @@ struct PipelineData:mx {
         cstr                        shader;
         size_t                      indicesSize;
 
+        Texture                     textures[Asset::count];
+
+        /*
         VkImage                     textureImage;
         VkDeviceMemory              textureImageMemory;
         VkImageView                 textureImageView;
         VkSampler                   textureSampler;
+        */
 
         ~impl();
 
@@ -247,7 +277,7 @@ struct PipelineData:mx {
 template <typename U, typename V>
 struct Pipeline:PipelineData {
     Pipeline():PipelineData() { }
-    Pipeline(Device device, symbol shader, symbol obj, symbol texture):PipelineData() {
+    Pipeline(Device device, symbol shader, symbol model):PipelineData() { /// instead of a texture it needs flags for the resources to load
         data->uniformSize = sizeof(U);
         data->vertexSize  = sizeof(V);
         data->shader      = (cstr)shader;
@@ -260,12 +290,17 @@ struct Pipeline:PipelineData {
 
         createDescriptorSetLayout();
         data->createGraphicsPipeline();
-        createTextureImage((cstr)texture);
-        createTextureImageView();
-        createTextureSampler();
 
-        loadModel((cstr)obj); /// keeps vector in stack
+        for (size_t i = 0; i < Asset::count; i++) {
+            data->textures[i] = Texture::load(device, model, Asset(i));
+        }
 
+        path p = fmt {"{0}.obj", {model}}; /// obj could have different level of details
+        if (p.exists())
+            loadModel(p.cs()); /// keeps vector in stack
+        else {
+            printf("model resource not found\n");
+        }
         data->createDescriptorSets();
     }
 
@@ -290,6 +325,7 @@ struct Pipeline:PipelineData {
             if (p.member_type == typeof(vec3f)) return VK_FORMAT_R32G32B32_SFLOAT;
             if (p.member_type == typeof(vec4f)) return VK_FORMAT_R32G32B32A32_SFLOAT;
             if (p.member_type == typeof(float)) return VK_FORMAT_R32_SFLOAT;
+            return VK_FORMAT_UNDEFINED;
         };
 
         for (prop &p: props) {
@@ -299,22 +335,7 @@ struct Pipeline:PipelineData {
             attributeDescriptions[index].offset   = p.offset;
             index++;
         }
-        /*
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(V, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(V, color);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(V, texCoord);
-        */
+   
         return attributeDescriptions;
     }
 
@@ -322,38 +343,6 @@ struct Pipeline:PipelineData {
         U ubo {};
         ubo.update(*this);
         memcpy(data->uniformBuffersMapped[data->device->currentFrame], &ubo, sizeof(ubo));
-    }
-
-    void createTextureImageView() {
-        data->textureImageView = data->device->createImageView(
-            data->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, data->device->mipLevels);
-    }
-
-    void createTextureSampler() {
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(data->device->gpu, &properties);
-
-        VkSamplerCreateInfo samplerInfo{};
-        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-        samplerInfo.magFilter = VK_FILTER_LINEAR;
-        samplerInfo.minFilter = VK_FILTER_LINEAR;
-        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-        samplerInfo.anisotropyEnable = VK_TRUE;
-        samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-        samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-        samplerInfo.unnormalizedCoordinates = VK_FALSE;
-        samplerInfo.compareEnable = VK_FALSE;
-        samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-        samplerInfo.minLod = 0.0f;
-        samplerInfo.maxLod = static_cast<float>(data->device->mipLevels);
-        samplerInfo.mipLodBias = 0.0f;
-
-        if (vkCreateSampler(data->device, &samplerInfo, nullptr, &data->textureSampler) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create texture sampler!");
-        }
     }
 
     void loadModel(cstr obj) {
@@ -376,7 +365,10 @@ struct Pipeline:PipelineData {
 
         for (const auto& shape : shapes) {
             for (const auto& index : shape.mesh.indices) {
-                V vertex { attrib.vertices.data(), index.vertex_index, attrib.texcoords.data(), index.texcoord_index };
+                V vertex {
+                    attrib.vertices.data(),  index.vertex_index,
+                    attrib.texcoords.data(), index.texcoord_index,
+                    attrib.normals.data(),   index.normal_index };
 
                 if (uniqueVertices.count(vertex) == 0) {
                     uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
@@ -425,7 +417,8 @@ struct Pipeline:PipelineData {
             memcpy(vdata, indices.data(), (size_t) bufferSize);
         vkUnmapMemory(data->device, stagingBufferMemory);
         
-        data->device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        data->device->createBuffer(bufferSize,
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             data->indexBuffer, data->indexBufferMemory);
         data->device->copyBuffer(stagingBuffer, data->indexBuffer, bufferSize);
         vkDestroyBuffer(data->device, stagingBuffer, nullptr);
@@ -438,7 +431,7 @@ struct Pipeline:PipelineData {
         uboLayoutBinding.descriptorCount = 1;
         uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutBinding samplerLayoutBinding{};
         samplerLayoutBinding.binding = 1;
@@ -456,43 +449,6 @@ struct Pipeline:PipelineData {
         if (vkCreateDescriptorSetLayout(data->device, &layoutInfo, nullptr, &data->descriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
-    }
-    
-    void createTextureImage(cstr texture_path) {
-        int texWidth, texHeight, texChannels;
-        stbi_uc* pixels = stbi_load((symbol)texture_path, &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-        VkDeviceSize imageSize = texWidth * texHeight * 4;
-        data->device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
-
-        if (!pixels) {
-            throw std::runtime_error("failed to load texture image!");
-        }
-
-        VkBuffer stagingBuffer;
-        VkDeviceMemory stagingBufferMemory;
-        data->device->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
-
-        void* vdata;
-        vkMapMemory(data->device, stagingBufferMemory, 0, imageSize, 0, &vdata);
-            memcpy(vdata, pixels, static_cast<size_t>(imageSize));
-        vkUnmapMemory(data->device, stagingBufferMemory);
-
-        stbi_image_free(pixels);
-
-        data->device->createImage(texWidth, texHeight, data->device->mipLevels,
-            VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            data->textureImage, data->textureImageMemory);
-
-        data->device->transitionImageLayout(data->textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            data->device->mipLevels);
-        data->device->copyBufferToImage(stagingBuffer, data->textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
-        //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
-
-        vkDestroyBuffer(data->device, stagingBuffer, nullptr);
-        vkFreeMemory(data->device, stagingBufferMemory, nullptr);
-
-        data->device->generateMipmaps(data->textureImage, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, data->device->mipLevels);
     }
 };
 

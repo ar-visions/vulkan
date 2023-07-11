@@ -1047,6 +1047,95 @@ Device::impl::~impl() {
     cleanupSwapChain();
 }
 
+Texture::impl::~impl() {
+    vkDestroySampler    (device, sampler, nullptr);
+    vkDestroyImageView  (device, view,    nullptr);
+    vkDestroyImage      (device, image,   nullptr);
+    vkFreeMemory        (device, memory,  nullptr);
+}
+
+void Texture::impl::create_image_view() {
+    view = device->createImageView(
+        image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, device->mipLevels);
+}
+
+void Texture::impl::create_sampler() {
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(device->gpu, &properties);
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = static_cast<float>(device->mipLevels);
+    samplerInfo.mipLodBias = 0.0f;
+
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create texture sampler!");
+    }
+}
+
+void Texture::impl::create_image(ion::path texture_path, Asset type) {
+    int texWidth, texHeight, texChannels;
+    stbi_uc* pixels = stbi_load((symbol)texture_path.cs(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+    VkDeviceSize imageSize = texWidth * texHeight * 4;
+    device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+
+    if (!pixels) {
+        throw std::runtime_error("failed to load texture image!");
+    }
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    device->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+
+    void* vdata;
+    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &vdata);
+        memcpy(vdata, pixels, static_cast<size_t>(imageSize));
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    stbi_image_free(pixels);
+
+    device->createImage(texWidth, texHeight, device->mipLevels,
+        VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        image, memory);
+
+    device->transitionImageLayout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        device->mipLevels);
+    device->copyBufferToImage(stagingBuffer, image, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
+    //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+    /// we dont always want to do this; parameterize
+    device->generateMipmaps(image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, device->mipLevels);
+    width = texWidth;
+    height = texHeight;
+    asset_type = type;
+}
+
+Texture Texture::load(Device &dev, symbol name, Asset type) {
+    Texture tx;
+    ion::path path = fmt {"{0}.{1}.png", { name }};
+    assert(path.exists());
+    tx->create_image(path, type);
+    tx->create_image_view();
+    tx->create_sampler();
+    return tx;
+}
 
 PipelineData::impl::~impl() {
     vkDestroyPipeline(device, graphicsPipeline, nullptr);
@@ -1056,11 +1145,7 @@ PipelineData::impl::~impl() {
         vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
     }
 
-    vkDestroySampler(device, textureSampler, nullptr);
-    vkDestroyImageView(device, textureImageView, nullptr);
-
-    vkDestroyImage(device, textureImage, nullptr);
-    vkFreeMemory(device, textureImageMemory, nullptr);
+    /// deleted texture here.
 
     vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 
@@ -1250,10 +1335,13 @@ void PipelineData::impl::createDescriptorSets() {
         bufferInfo.offset = 0;
         bufferInfo.range = uniformSize;//sizeof(UniformBufferObject);
 
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = textureImageView;
-        imageInfo.sampler = textureSampler;
+        VkDescriptorImageInfo imageInfo[Asset::count];
+        memset(imageInfo, 0, sizeof(VkDescriptorImageInfo) * Asset::count);
+        for (size_t a = 0; a < Asset::count; a++) {
+            imageInfo[a].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo[a].imageView   = textures[a]->view;
+            imageInfo[a].sampler     = textures[a]->sampler; /// if images are not found, they are converted into constant 2x2 image
+        } /// this is in order to keep the pipeline simple, configurable, and using a generic disney shader
 
         std::array<VkWriteDescriptorSet, 2> descriptorWrites { };
 
@@ -1270,8 +1358,8 @@ void PipelineData::impl::createDescriptorSets() {
         descriptorWrites[1].dstBinding      = 1;
         descriptorWrites[1].dstArrayElement = 0;
         descriptorWrites[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = 1;
-        descriptorWrites[1].pImageInfo      = &imageInfo;
+        descriptorWrites[1].descriptorCount = Asset::count;
+        descriptorWrites[1].pImageInfo      = &imageInfo[0];
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
