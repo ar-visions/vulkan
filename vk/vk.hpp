@@ -366,8 +366,8 @@ struct Pipeline:PipelineData {
         createDescriptorSetLayout();
         data->createGraphicsPipeline();
 
-        for (size_t i = 0; i < Asset::count; i++) {
-            data->textures[i] = Texture::load(device, model, Asset(i));
+        for (size_t i = 1; i < Asset::count; i++) {
+            data->textures[i - 1] = Texture::load(device, model, Asset(i));
         }
 
         path p = fmt {"{0}.obj", {model}}; /// obj could have different level of details
