@@ -34,7 +34,7 @@ struct Vertex {
 
     operator bool() { return pos.length() > 0; } /// needs to be optional, but the design-time check doesnt seem to work
 
-    register(Vertex);
+    type_register(Vertex);
 
     bool operator==(const Vertex& b) const {
         return pos == b.pos && color == b.color && texCoord == b.texCoord;
@@ -109,10 +109,10 @@ struct HelloTriangleApplication:mx {
         }
 
         operator bool() { return sz.x > 0; }
-        register(impl);
+        type_register(impl);
     };
     
-    ptr(HelloTriangleApplication, mx, impl);
+    mx_object(HelloTriangleApplication, mx, impl);
 
     HelloTriangleApplication(vec2i sz):HelloTriangleApplication() {
         data->init(sz);

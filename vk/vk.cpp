@@ -68,7 +68,7 @@ std::vector<symbol> Vulkan::impl::getRequiredExtensions() {
     return extensions;
 }
 
-ptr_implement(Vulkan, mx);
+mx_implement(Vulkan, mx);
 
 bool Vulkan::impl::check_validation() {
     uint32_t layerCount;

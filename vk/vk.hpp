@@ -53,9 +53,9 @@ struct Vulkan:mx {
         bool check_validation();
         std::vector<symbol> getRequiredExtensions();
         operator bool();
-        register(impl);
+        type_register(impl);
     };
-    ptr_declare(Vulkan, mx, impl);
+    mx_declare(Vulkan, mx, impl);
 
     /// need not construct unless we want a specific version other than 1.0
     Vulkan(int v_major, int v_minor):Vulkan() {
@@ -87,7 +87,7 @@ struct GPU:mx {
 
         ~impl();
         operator bool() { return phys != VK_NULL_HANDLE; }
-        register(impl);
+        type_register(impl);
     };
 
     operator VkPhysicalDevice();
@@ -110,7 +110,7 @@ struct GPU:mx {
 
     static GPU select(vec2i sz);
 
-    ptr(GPU, mx, impl);
+    mx_object(GPU, mx, impl);
 };
 
 struct Device:mx {
@@ -175,15 +175,90 @@ struct Device:mx {
         void cleanupSwapChain();
         ~impl();
         operator bool() { return device != VK_NULL_HANDLE; }
-        register(impl);
+        type_register(impl);
     };
 
     static Device create(GPU &gpu);
     operator VkDevice();
-    ptr(Device, mx, impl);
+    mx_object(Device, mx, impl);
 };
 
-enums(Asset, undefined, "undefined, color, normal, material", undefined, color, normal, material);
+static str abc1 = "abc";
+
+struct Asset:ex {\
+    inline static bool init;\
+    enum etype { undefined, color, normal, material };\
+    enum etype&    value;\
+    static memory* lookup(symbol sym) { return typeof(Asset)->lookup(sym); }\
+    static memory* lookup(u64    id)  { return typeof(Asset)->lookup(id);  }\
+    inline static const int count = num_args(undefined, color, normal, material);\
+    inline static const str raw   = str_args(undefined, color, normal, material);\
+    static void initialize() {\
+        init            = true;\
+        array<str>   ra = raw.split(", ");\
+        array<str>   sp = str("undefined, color, normal, material").split(", ");\
+        size_t        c = sp.len();\
+        type_t       ty = typeof(Asset);\
+        i64        next = 0;\
+        for (size_t i = 0; i < c; i++) {\
+            size_t idx = ra.index_of("=");\
+            if (idx >= 0) {\
+                str val = ra[i].mid(idx + 1);\
+                mem_symbol(sp[i].data, ty, val.integer_value());\
+            } else\
+                mem_symbol(sp[i].data, ty, i64(next));\
+            next = i + 1;\
+        };\
+    }\
+    ion::symbol symbol() {\
+        memory *mem = typeof(Asset)->lookup(u64(value));\
+        assert(mem);\
+        return (char*)mem->origin;\
+    }\
+    str name() { return (char*)symbol(); }\
+    static enum etype convert(mx raw) {\
+        if (!init) initialize();\
+        type_t   type = typeof(Asset);\
+        memory **psym = null;\
+        if (raw.type() == typeof(char)) {\
+            char  *d = &raw.ref<char>();\
+            u64 hash = djb2(d);\
+            psym     = type->symbols->djb2.lookup(hash);\
+        } else if (raw.type() == typeof(int)) {\
+            i64   id = i64(raw.ref<int>());\
+            psym     = type->symbols->ids.lookup(id);\
+        } else if (raw.type() == typeof(i64)) {\
+            i64   id = raw.ref<i64>();\
+            psym     = type->symbols->ids.lookup(id);\
+        } else if (raw.type() == typeof(etype)) {\
+            i64   id = raw.ref<etype>();\
+            psym     = type->symbols->ids.lookup(id);\
+        }\
+        if (!psym) throw Asset();\
+        return (enum etype)((*psym)->id);\
+    }\
+    Asset(enum etype t = etype::undefined):ex(t, this), value(ref<enum etype>()) { if (!init) initialize(); }\
+    Asset(size_t     t):ex((enum etype)t, this), value(ref<enum etype>()) { if (!init) initialize(); }\
+    Asset(int        t):ex((enum etype)t, this), value(ref<enum etype>()) { if (!init) initialize(); }\
+    Asset(str raw):Asset(Asset::convert(raw)) { }\
+    Asset(mx  raw):Asset(Asset::convert(raw)) { }\
+    inline  operator etype() { return value; }\
+    static doubly<memory*> &symbols() {\
+        if (!init) initialize();\
+        return typeof(Asset)->symbols->list;\
+    }\
+    Asset&      operator=  (const Asset b)  { return (Asset&)assign_mx(*this, b); }\
+    bool    operator== (enum etype v) { return value == v; }\
+    bool    operator!= (enum etype v) { return value != v; }\
+    bool    operator>  (Asset &b)       { return value >  b.value; }\
+    bool    operator<  (Asset &b)       { return value <  b.value; }\
+    bool    operator>= (Asset &b)       { return value >= b.value; }\
+    bool    operator<= (Asset &b)       { return value <= b.value; }\
+    explicit operator int()         { return int(value); }\
+    explicit operator u64()         { return u64(value); }\
+};\
+
+//enums(Asset, undefined, "undefined, color, normal, material", undefined, color, normal, material);
 
 struct Texture:mx {
     struct impl {
@@ -202,9 +277,9 @@ struct Texture:mx {
         void create_image(ion::path texture_path, Asset type);
         ~impl();
         operator bool() { return image != VK_NULL_HANDLE; }
-        register(impl);
+        type_register(impl);
     };
-    ptr(Texture, mx, impl);
+    mx_object(Texture, mx, impl);
     static Texture load(Device &dev, symbol name, Asset type);
 };
 
@@ -265,12 +340,12 @@ struct PipelineData:mx {
 
         void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
         operator bool() { return graphicsPipeline != VK_NULL_HANDLE; }
-        register(impl);
+        type_register(impl);
     };
 
     virtual void updateUniformBuffer();
 
-    ptr(PipelineData, mx, impl);
+    mx_object(PipelineData, mx, impl);
 };
 
 /// this 'constructs' a PipelineData which is a struct that holds the pipeline info
