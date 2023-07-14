@@ -6,7 +6,7 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
     mat4 proj;
-    vec3 light_pos [MAX_PBR_LIGHTS];
+    vec4 light_pos [MAX_PBR_LIGHTS];
     vec4 light_rgba[MAX_PBR_LIGHTS];
 } ubo;
 
@@ -34,7 +34,7 @@ void main() {
     for (int i = 0; i < MAX_PBR_LIGHTS; ++i) {
         vec3  light    = ubo.light_rgba[i].rgb * ubo.light_rgba[i].a;
 
-        vec3  L        = normalize(ubo.light_pos[i] - in_pos);
+        vec3  L        = normalize(ubo.light_pos[i].xyz - in_pos);
         vec3  H        = normalize(V + L);
 
         float NdotL    = max(dot(N, L), 0.0);
@@ -58,5 +58,5 @@ void main() {
 
     vec3 ambient       = color * ao;
     vec3 final_color   = ambient + total_light;
-    pixel              = vec4(final_color, 1.0);
+    pixel              = vec4(ambient, 1.0);//vec4(0.0, 0.0, ao, 1.0);//vec4(final_color, 1.0);
 }

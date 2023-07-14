@@ -12,8 +12,10 @@
 
 #include <vk/stb_image.h>
 #include <vk/tiny_obj_loader.h>
+
 #include <mx/mx.hpp>
 #include <math/math.hpp>
+#include <watch/watch.hpp>
 
 //#include <iostream>
 //#include <fstream>
@@ -225,10 +227,6 @@ struct PipelineData:mx {
         VkDescriptorSetLayout       descriptorSetLayout;
         VkPipelineLayout            pipelineLayout;
         VkPipeline                  graphicsPipeline;
-        VkVertexInputBindingDescription binding_desc;
-        std::vector<VkVertexInputAttributeDescription> attr_desc;
-
-        std::vector<VkDescriptorSet> descriptorSets;
         VkBuffer                    vertexBuffer;
         VkDeviceMemory              vertexBufferMemory;
         VkBuffer                    indexBuffer;
@@ -237,15 +235,17 @@ struct PipelineData:mx {
         size_t                      vertexSize;
         cstr                        shader;
         size_t                      indicesSize;
+        lambda<void()>              reload;
+        watch                       watcher;
 
-        Texture                     textures[Asset::count - 1];
+        std::vector<VkDescriptorSet>                   descriptorSets;
+        VkVertexInputBindingDescription                binding_desc;
+        std::vector<VkVertexInputAttributeDescription> attr_desc;
 
-        /*
-        VkImage                     textureImage;
-        VkDeviceMemory              textureImageMemory;
-        VkImageView                 textureImageView;
-        VkSampler                   textureSampler;
-        */
+        Texture textures[Asset::count - 1];
+
+        void start(symbol shader, symbol model);
+        void cleanup(); /// impl calls cleanup, but cleanup is called prior to a reload
 
         ~impl();
 
@@ -285,27 +285,38 @@ struct PipelineData:mx {
 template <typename U, typename V>
 struct Pipeline:PipelineData {
     Pipeline():PipelineData() { }
-    Pipeline(Device device, symbol shader, symbol model):PipelineData() { /// instead of a texture it needs flags for the resources to load
-        data->uniformSize = sizeof(U);
-        data->vertexSize  = sizeof(V);
-        data->shader      = (cstr)shader;
-        data->device      = device;
 
-        data->binding_desc = getBindingDescription();
-        data->attr_desc    = getAttributeDescriptions();
+    /// pipelines track themselves, and notify the user (the app that a reload is happening [likely needed for status/logging alone?])
+    /// important to note that Device is not reloaded
+    /// if you have 40 pipelines and 1 file changes associated to one of them, we are not rebuilding all 40, just 1.
+    Pipeline(Device device, symbol shader, symbol model, lambda<void()> on_change):PipelineData() { /// instead of a texture it needs flags for the resources to load
+        data->uniformSize  = sizeof(U);
+        data->vertexSize   = sizeof(V);
+        data->shader       = (cstr)shader;
+        data->device       = device;
 
-        data->createUniformBuffers<U>();
-        data->createDescriptorSetLayout();
-        data->createGraphicsPipeline();
+        ///
+        data->reload = [&]() {
+            data->binding_desc = getBindingDescription();
+            data->attr_desc    = getAttributeDescriptions();
+            data->createUniformBuffers<U>();
+            data->createDescriptorSetLayout();
 
-        for (size_t i = 1; i < Asset::count; i++) {
-            data->textures[i - 1] = Texture::load(device, model, Asset(i));
-        }
+            /// this function need not make the .spv, the watcher service does this
+            data->createGraphicsPipeline();
 
-        path p = fmt {"models/{0}.obj", {model}}; /// obj could have different level of details
-        console.test(p.exists(), "model resource not found");
-        loadModel(p.cs()); /// keeps vector in stack
-        data->createDescriptorSets();
+            for (size_t i = 1; i < Asset::count; i++) {
+                data->textures[i - 1] = Texture::load(device, model, Asset(i));
+            }
+
+            path p = fmt {"models/{0}.obj", {model}}; /// obj could have different level of details
+            console.test(p.exists(), "model resource not found");
+            loadModel(p.cs()); /// keeps vector in stack
+            data->createDescriptorSets();
+        };
+
+        /// start monitoring for changes, also recompiles shaders each time (if a shader does not compile on first go, it will error right away and thats useful)
+        data->start(shader, model); /// the monitor needs the shader and the model so it can extrapolate what to listen for
     }
 
     static VkVertexInputBindingDescription getBindingDescription() {

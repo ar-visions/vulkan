@@ -1154,25 +1154,46 @@ Texture Texture::load(Device &dev, symbol name, Asset type) {
     return tx;
 }
 
-PipelineData::impl::~impl() {
-    vkDestroyPipeline(device, graphicsPipeline, nullptr);
+void PipelineData::impl::start(symbol shader, symbol model) {
+    // compile .spv on load if its not there
+    static lambda<void(bool, array<path_op> &)> rld;
+    
+    rld = [data=this](bool first, array<path_op> &ops) {
+        printf("reloading...");
+        data->reload();
+    };
+    // watch watch::spawn(array<path> paths, array<str> exts, states<path::option> options, watch::fn watch_fn
+    // lambda<void(bool, array<path_op> &)>
+    array<path> paths;
+    paths += path("./shaders");
+    paths += path("./textures");
+    paths += path("./models");
+
+    watcher = watch::spawn(paths, {".frag", ".vert", ".png", ".obj"}, {}, rld);
+}
+
+void PipelineData::impl::cleanup() {
+    vkDestroyPipeline(device, graphicsPipeline, null);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroyBuffer(device, uniformBuffers[i], nullptr);
-        vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
+        vkDestroyBuffer (device, uniformBuffers[i],       null);
+        vkFreeMemory    (device, uniformBuffersMemory[i], null);
     }
 
-    /// deleted texture here.
+    /// delete texture here (not required i think, when we recreate it shouldnt matter that the pipeline is no longer)
+    for (int i = 1; i < Asset::count; i++)
+        textures[i - 1] = Texture();
 
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
+    vkDestroyDescriptorSetLayout (device, descriptorSetLayout,  null);
+    vkDestroyBuffer              (device, indexBuffer,          null);
+    vkFreeMemory                 (device, indexBufferMemory,    null);
+    vkDestroyBuffer              (device, vertexBuffer,         null);
+    vkFreeMemory                 (device, vertexBufferMemory,   null);
+    vkDestroyPipelineLayout      (device, pipelineLayout,       null);
+}
 
-    vkDestroyBuffer(device, indexBuffer, nullptr);
-    vkFreeMemory(device, indexBufferMemory, nullptr);
-
-    vkDestroyBuffer(device, vertexBuffer, nullptr);
-    vkFreeMemory(device, vertexBufferMemory, nullptr);
-
-    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+PipelineData::impl::~impl() {
+    cleanup();
 }
 
 std::vector<char> PipelineData::impl::readFile(symbol filename) {
