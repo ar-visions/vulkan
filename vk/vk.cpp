@@ -290,7 +290,14 @@ bool GPU::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFam
     return indices.isComplete() && extensionsSupported && swapChainAdequate  && supportedFeatures.samplerAnisotropy;
 }
 
-GPU GPU::select(vec2i sz) {
+void GPU::impl::framebuffer_resized(GLFWwindow* window, int width, int height) {
+    GPU::impl *g = (GPU::impl*)(glfwGetWindowUserPointer(window));
+    g->sz = vec2i { width, height };
+    g->resize(g->sz, g->user_data);
+}
+
+/// select gpu, initialize vulkan, create window and register user
+GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     GPU g = GPU();
 
     g->window = initWindow(sz);
@@ -323,6 +330,11 @@ GPU GPU::select(vec2i sz) {
     if (g->phys == VK_NULL_HANDLE) {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
+
+    /// we must fully isolate glfw here
+    g->user_data = user_data;
+    glfwSetWindowUserPointer(g->window, g.data);
+    glfwSetFramebufferSizeCallback(g->window, impl::framebuffer_resized);
     return g;
 }
 
@@ -366,11 +378,14 @@ void Device::impl::recreateSwapChain() {
 }
 
 void Device::impl::createDescriptorPool() {
-    std::array<VkDescriptorPoolSize, 2> poolSizes{};
+    std::array<VkDescriptorPoolSize, 1 + (Asset::count - 1)> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * Asset::count);
+    ///
+    for (int i = 1; i < Asset::count; i++) {
+        poolSizes[i].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[i].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    }
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -758,24 +773,22 @@ void Device::impl::transitionImageLayout(VkImage image, VkFormat format, VkImage
 
 void Device::impl::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {
-        width,
-        height,
-        1
+    VkBufferImageCopy region {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .imageSubresource.mipLevel = 0,
+        .imageSubresource.baseArrayLayer = 0,
+        .imageSubresource.layerCount = 1,
+        .imageOffset = {0, 0, 0},
+        .imageExtent = {
+            width,
+            height,
+            1
+        }
     };
-
     vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
     endSingleTimeCommands(commandBuffer);
 }
 
@@ -1087,7 +1100,7 @@ void Texture::impl::create_sampler() {
 }
 
 void Texture::impl::create_image(ion::path texture_path, Asset type) {
-    int texWidth, texHeight, texChannels;
+    int texWidth, texHeight, texChannels = 4;
     stbi_uc* pixels = stbi_load((symbol)texture_path.cs(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize = texWidth * texHeight * 4;
     device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
@@ -1098,7 +1111,10 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
-    device->createBuffer(imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    device->createBuffer(imageSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer, stagingBufferMemory);
 
     void* vdata;
     vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &vdata);
@@ -1129,8 +1145,9 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
 
 Texture Texture::load(Device &dev, symbol name, Asset type) {
     Texture tx;
-    ion::path path = fmt {"{0}.{1}.png", { name, type }};
+    ion::path path = fmt {"textures/{0}.{1}.png", { str(name), str(type.symbol()) }};
     assert(path.exists());
+    tx->device = dev;
     tx->create_image(path, type);
     tx->create_image_view();
     tx->create_sampler();
@@ -1251,62 +1268,62 @@ void PipelineData::impl::createGraphicsPipeline() {
     multisampling.rasterizationSamples = device->gpu->msaaSamples;
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
-    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable = VK_TRUE;
-    depthStencil.depthWriteEnable = VK_TRUE;
-    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-    depthStencil.depthBoundsTestEnable = VK_FALSE;
-    depthStencil.stencilTestEnable = VK_FALSE;
+    depthStencil.sType                  = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable        = VK_TRUE;
+    depthStencil.depthWriteEnable       = VK_TRUE;
+    depthStencil.depthCompareOp         = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable  = VK_FALSE;
+    depthStencil.stencilTestEnable      = VK_FALSE;
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    colorBlendAttachment.blendEnable    = VK_FALSE;
 
     VkPipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    colorBlending.logicOpEnable = VK_FALSE;
-    colorBlending.logicOp = VK_LOGIC_OP_COPY;
-    colorBlending.attachmentCount = 1;
-    colorBlending.pAttachments = &colorBlendAttachment;
-    colorBlending.blendConstants[0] = 0.0f;
-    colorBlending.blendConstants[1] = 0.0f;
-    colorBlending.blendConstants[2] = 0.0f;
-    colorBlending.blendConstants[3] = 0.0f;
+    colorBlending.sType                 = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.logicOpEnable         = VK_FALSE;
+    colorBlending.logicOp               = VK_LOGIC_OP_COPY;
+    colorBlending.attachmentCount       = 1;
+    colorBlending.pAttachments          = &colorBlendAttachment;
+    colorBlending.blendConstants[0]     = 0.0f;
+    colorBlending.blendConstants[1]     = 0.0f;
+    colorBlending.blendConstants[2]     = 0.0f;
+    colorBlending.blendConstants[3]     = 0.0f;
 
     std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR
     };
     VkPipelineDynamicStateCreateInfo dynamicState{};
-    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-    dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
-    dynamicState.pDynamicStates = dynamicStates.data();
+    dynamicState.sType                  = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount      = static_cast<uint32_t>(dynamicStates.size());
+    dynamicState.pDynamicStates         = dynamicStates.data();
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+    pipelineLayoutInfo.sType            = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount   = 1;
+    pipelineLayoutInfo.pSetLayouts      = &descriptorSetLayout;
 
     if (vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout!");
     }
 
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
-    pipelineInfo.pVertexInputState = &vertexInputInfo;
-    pipelineInfo.pInputAssemblyState = &inputAssembly;
-    pipelineInfo.pViewportState = &viewportState;
-    pipelineInfo.pRasterizationState = &rasterizer;
-    pipelineInfo.pMultisampleState = &multisampling;
-    pipelineInfo.pDepthStencilState = &depthStencil;
-    pipelineInfo.pColorBlendState = &colorBlending;
-    pipelineInfo.pDynamicState = &dynamicState;
-    pipelineInfo.layout = pipelineLayout;
-    pipelineInfo.renderPass = device->renderPass;
-    pipelineInfo.subpass = 0;
-    pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+    VkGraphicsPipelineCreateInfo pipelineInfo { };
+    pipelineInfo.sType                  = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.stageCount             = 2;
+    pipelineInfo.pStages                = shaderStages;
+    pipelineInfo.pVertexInputState      = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState    = &inputAssembly;
+    pipelineInfo.pViewportState         = &viewportState;
+    pipelineInfo.pRasterizationState    = &rasterizer;
+    pipelineInfo.pMultisampleState      = &multisampling;
+    pipelineInfo.pDepthStencilState     = &depthStencil;
+    pipelineInfo.pColorBlendState       = &colorBlending;
+    pipelineInfo.pDynamicState          = &dynamicState;
+    pipelineInfo.layout                 = pipelineLayout;
+    pipelineInfo.renderPass             = device->renderPass;
+    pipelineInfo.subpass                = 0;
+    pipelineInfo.basePipelineHandle     = VK_NULL_HANDLE;
 
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics pipeline!");
@@ -1316,13 +1333,45 @@ void PipelineData::impl::createGraphicsPipeline() {
     vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
+
+// fix this, get this working; its basically a duplicate of 
+void PipelineData::impl::createDescriptorSetLayout() {
+    VkDescriptorSetLayoutBinding layoutBinding[1 + Asset::count - 1];
+    memset(&layoutBinding, 0, sizeof(layoutBinding));
+
+    layoutBinding[0].binding = 0;
+    layoutBinding[0].descriptorCount = 1;
+    layoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layoutBinding[0].pImmutableSamplers = nullptr;
+    layoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    /// once this works, go back to array i think.
+    for (int i = 1; i < Asset::count; i++) {
+        layoutBinding[i].binding = i;
+        layoutBinding[i].descriptorCount = 1;
+        layoutBinding[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        layoutBinding[i].pImmutableSamplers = nullptr;
+        layoutBinding[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    }
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = static_cast<uint32_t>(sizeof(layoutBinding) / sizeof(VkDescriptorSetLayoutBinding));
+    layoutInfo.pBindings = layoutBinding;
+
+    if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor set layout!");
+    }
+}
+
+/// get this working, test this
 void PipelineData::impl::createDescriptorSets() {
     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo{};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = device->descriptorPool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    allocInfo.pSetLayouts = layouts.data();
+    VkDescriptorSetAllocateInfo allocInfo {};
+    allocInfo.sType                 = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool        = device->descriptorPool;
+    allocInfo.descriptorSetCount    = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    allocInfo.pSetLayouts           = layouts.data();
 
     descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
     if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
@@ -1335,16 +1384,7 @@ void PipelineData::impl::createDescriptorSets() {
         bufferInfo.offset = 0;
         bufferInfo.range = uniformSize;//sizeof(UniformBufferObject);
 
-        VkDescriptorImageInfo imageInfo[Asset::count];
-        memset(imageInfo, 0, sizeof(VkDescriptorImageInfo) * Asset::count);
-        for (size_t a = 0; a < Asset::count; a++) {
-            imageInfo[a].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo[a].imageView   = textures[a]->view;
-            imageInfo[a].sampler     = textures[a]->sampler; /// if images are not found, they are converted into constant 2x2 image
-        } /// this is in order to keep the pipeline simple, configurable, and using a generic disney shader
-
-        std::array<VkWriteDescriptorSet, 2> descriptorWrites { };
-
+        std::array<VkWriteDescriptorSet, 1 + Asset::count - 1> descriptorWrites { };
         descriptorWrites[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet          = descriptorSets[i];
         descriptorWrites[0].dstBinding      = 0;
@@ -1353,13 +1393,23 @@ void PipelineData::impl::createDescriptorSets() {
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo     = &bufferInfo;
 
-        descriptorWrites[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptorWrites[1].dstSet          = descriptorSets[i];
-        descriptorWrites[1].dstBinding      = 1;
-        descriptorWrites[1].dstArrayElement = 0;
-        descriptorWrites[1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        descriptorWrites[1].descriptorCount = Asset::count;
-        descriptorWrites[1].pImageInfo      = &imageInfo[0];
+        VkDescriptorImageInfo imageInfo[Asset::count - 1];
+        memset(imageInfo, 0, sizeof(imageInfo));
+        for (size_t a = 0; a < Asset::count - 1; a++) {
+            imageInfo[a].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo[a].imageView   = textures[a]->view;
+            imageInfo[a].sampler     = textures[a]->sampler; /// if images are not found, they are converted into constant 2x2 image
+        }
+
+        for (int ii = 1; ii < Asset::count; ii++) {
+            descriptorWrites[ii].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[ii].dstSet          = descriptorSets[i];
+            descriptorWrites[ii].dstBinding      = ii;
+            descriptorWrites[ii].dstArrayElement = 0;
+            descriptorWrites[ii].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[ii].descriptorCount = 1;
+            descriptorWrites[ii].pImageInfo      = &imageInfo[ii - 1];
+        }
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }

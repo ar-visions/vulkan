@@ -74,6 +74,9 @@ struct SwapChainSupportDetails {
 
 struct PipelineData;
 
+/// we need more key handlers
+using ResizeFn = void(*)(vec2i&, void*);
+
 struct GPU:mx {
     struct impl {
         VkPhysicalDevice        phys        = VK_NULL_HANDLE;
@@ -82,8 +85,13 @@ struct GPU:mx {
         VkSurfaceKHR            surface     = 0;
         QueueFamilyIndices      indices;
         SwapChainSupportDetails details;
+        void*                   user_data;
+        ResizeFn                resize;
+        vec2i                   sz;
 
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+        static void framebuffer_resized(GLFWwindow *, int, int);
 
         ~impl();
         operator bool() { return phys != VK_NULL_HANDLE; }
@@ -108,8 +116,8 @@ struct GPU:mx {
 
     static bool isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFamilyIndices &indices, SwapChainSupportDetails &swapChainSupport);
 
-    static GPU select(vec2i sz);
-
+    static GPU select(vec2i sz, ResizeFn resize, void *user_data);
+    
     mx_object(GPU, mx, impl);
 };
 
@@ -183,82 +191,7 @@ struct Device:mx {
     mx_object(Device, mx, impl);
 };
 
-static str abc1 = "abc";
-
-struct Asset:ex {\
-    inline static bool init;\
-    enum etype { undefined, color, normal, material };\
-    enum etype&    value;\
-    static memory* lookup(symbol sym) { return typeof(Asset)->lookup(sym); }\
-    static memory* lookup(u64    id)  { return typeof(Asset)->lookup(id);  }\
-    inline static const int count = num_args(undefined, color, normal, material);\
-    inline static const str raw   = str_args(undefined, color, normal, material);\
-    static void initialize() {\
-        init            = true;\
-        array<str>   ra = raw.split(", ");\
-        array<str>   sp = str("undefined, color, normal, material").split(", ");\
-        size_t        c = sp.len();\
-        type_t       ty = typeof(Asset);\
-        i64        next = 0;\
-        for (size_t i = 0; i < c; i++) {\
-            size_t idx = ra.index_of("=");\
-            if (idx >= 0) {\
-                str val = ra[i].mid(idx + 1);\
-                mem_symbol(sp[i].data, ty, val.integer_value());\
-            } else\
-                mem_symbol(sp[i].data, ty, i64(next));\
-            next = i + 1;\
-        };\
-    }\
-    ion::symbol symbol() {\
-        memory *mem = typeof(Asset)->lookup(u64(value));\
-        assert(mem);\
-        return (char*)mem->origin;\
-    }\
-    str name() { return (char*)symbol(); }\
-    static enum etype convert(mx raw) {\
-        if (!init) initialize();\
-        type_t   type = typeof(Asset);\
-        memory **psym = null;\
-        if (raw.type() == typeof(char)) {\
-            char  *d = &raw.ref<char>();\
-            u64 hash = djb2(d);\
-            psym     = type->symbols->djb2.lookup(hash);\
-        } else if (raw.type() == typeof(int)) {\
-            i64   id = i64(raw.ref<int>());\
-            psym     = type->symbols->ids.lookup(id);\
-        } else if (raw.type() == typeof(i64)) {\
-            i64   id = raw.ref<i64>();\
-            psym     = type->symbols->ids.lookup(id);\
-        } else if (raw.type() == typeof(etype)) {\
-            i64   id = raw.ref<etype>();\
-            psym     = type->symbols->ids.lookup(id);\
-        }\
-        if (!psym) throw Asset();\
-        return (enum etype)((*psym)->id);\
-    }\
-    Asset(enum etype t = etype::undefined):ex(t, this), value(ref<enum etype>()) { if (!init) initialize(); }\
-    Asset(size_t     t):ex((enum etype)t, this), value(ref<enum etype>()) { if (!init) initialize(); }\
-    Asset(int        t):ex((enum etype)t, this), value(ref<enum etype>()) { if (!init) initialize(); }\
-    Asset(str raw):Asset(Asset::convert(raw)) { }\
-    Asset(mx  raw):Asset(Asset::convert(raw)) { }\
-    inline  operator etype() { return value; }\
-    static doubly<memory*> &symbols() {\
-        if (!init) initialize();\
-        return typeof(Asset)->symbols->list;\
-    }\
-    Asset&      operator=  (const Asset b)  { return (Asset&)assign_mx(*this, b); }\
-    bool    operator== (enum etype v) { return value == v; }\
-    bool    operator!= (enum etype v) { return value != v; }\
-    bool    operator>  (Asset &b)       { return value >  b.value; }\
-    bool    operator<  (Asset &b)       { return value <  b.value; }\
-    bool    operator>= (Asset &b)       { return value >= b.value; }\
-    bool    operator<= (Asset &b)       { return value <= b.value; }\
-    explicit operator int()         { return int(value); }\
-    explicit operator u64()         { return u64(value); }\
-};\
-
-//enums(Asset, undefined, "undefined, color, normal, material", undefined, color, normal, material);
+enums(Asset, undefined, "undefined, color, normal, material", undefined, color, normal, material);
 
 struct Texture:mx {
     struct impl {
@@ -305,7 +238,7 @@ struct PipelineData:mx {
         cstr                        shader;
         size_t                      indicesSize;
 
-        Texture                     textures[Asset::count];
+        Texture                     textures[Asset::count - 1];
 
         /*
         VkImage                     textureImage;
@@ -320,9 +253,9 @@ struct PipelineData:mx {
 
         VkShaderModule createShaderModule(const std::vector<char>& code);
 
-        void createGraphicsPipeline();
-
+        void createDescriptorSetLayout();
         void createDescriptorSets();
+        void createGraphicsPipeline();
 
         template <typename T>
         void createUniformBuffers() {
@@ -357,25 +290,21 @@ struct Pipeline:PipelineData {
         data->vertexSize  = sizeof(V);
         data->shader      = (cstr)shader;
         data->device      = device;
-        
+
         data->binding_desc = getBindingDescription();
         data->attr_desc    = getAttributeDescriptions();
 
         data->createUniformBuffers<U>();
-
-        createDescriptorSetLayout();
+        data->createDescriptorSetLayout();
         data->createGraphicsPipeline();
 
         for (size_t i = 1; i < Asset::count; i++) {
             data->textures[i - 1] = Texture::load(device, model, Asset(i));
         }
 
-        path p = fmt {"{0}.obj", {model}}; /// obj could have different level of details
-        if (p.exists())
-            loadModel(p.cs()); /// keeps vector in stack
-        else {
-            printf("model resource not found\n");
-        }
+        path p = fmt {"models/{0}.obj", {model}}; /// obj could have different level of details
+        console.test(p.exists(), "model resource not found");
+        loadModel(p.cs()); /// keeps vector in stack
         data->createDescriptorSets();
     }
 
@@ -498,32 +427,6 @@ struct Pipeline:PipelineData {
         data->device->copyBuffer(stagingBuffer, data->indexBuffer, bufferSize);
         vkDestroyBuffer(data->device, stagingBuffer, nullptr);
         vkFreeMemory(data->device, stagingBufferMemory, nullptr);
-    }
-
-    void createDescriptorSetLayout() {
-        VkDescriptorSetLayoutBinding uboLayoutBinding{};
-        uboLayoutBinding.binding = 0;
-        uboLayoutBinding.descriptorCount = 1;
-        uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        uboLayoutBinding.pImmutableSamplers = nullptr;
-        uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        VkDescriptorSetLayoutBinding samplerLayoutBinding{};
-        samplerLayoutBinding.binding = 1;
-        samplerLayoutBinding.descriptorCount = 1;
-        samplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        samplerLayoutBinding.pImmutableSamplers = nullptr;
-        samplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {uboLayoutBinding, samplerLayoutBinding};
-        VkDescriptorSetLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-        layoutInfo.pBindings = bindings.data();
-
-        if (vkCreateDescriptorSetLayout(data->device, &layoutInfo, nullptr, &data->descriptorSetLayout) != VK_SUCCESS) {
-            throw std::runtime_error("failed to create descriptor set layout!");
-        }
     }
 };
 

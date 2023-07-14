@@ -16,18 +16,14 @@ layout(location = 2) in vec2 in_uv;
 
 layout(location = 0) out vec4 pixel;
 
-#define ASSET_COUNT 3
-
-#define COLOR    0
-#define NORMAL   1
-#define MATERIAL 2
-
-layout(binding  = 1) uniform sampler2D tx[ASSET_COUNT];
+layout(binding = 1) uniform sampler2D tx_color;
+layout(binding = 2) uniform sampler2D tx_normal;
+layout(binding = 3) uniform sampler2D tx_material;
 
 void main() {
-    vec3  color       = texture(tx[COLOR], in_uv).rgb;
-    vec3  normal      = normalize(texture(tx[NORMAL], in_uv).rgb * 2.0 - 1.0);
-    vec3  material    = texture(tx[MATERIAL], in_uv).rgb;
+    vec3  color       = texture(tx_color, in_uv).rgb;
+    vec3  normal      = normalize(texture(tx_normal, in_uv).rgb * 2.0 - 1.0);
+    vec3  material    = texture(tx_material, in_uv).rgb;
     float metallic    = material.r;
     float roughness   = material.g;
     float ao          = material.b;
