@@ -58,8 +58,8 @@ struct UniformBufferObject {
     alignas(16) glm::vec3 light_dir;
     alignas(16) glm::vec3 light_rgb;
 
-    void update(PipelineData &pipeline) {
-        VkExtent2D &ext = pipeline->device->swapChainExtent;
+    void update(void *data) {
+        VkExtent2D &ext = ((Pipeline::impl*)data)->device->swapChainExtent;
 
         static auto startTime   = std::chrono::high_resolution_clock::now();
         auto        currentTime = std::chrono::high_resolution_clock::now();
@@ -82,7 +82,7 @@ struct HelloTriangleApplication:mx {
         GPU       gpu;         /// GPU class, responsible for holding onto GPU, Surface and GLFWwindow
         Device    device;      /// Device created with GPU
         
-        Pipeline<UniformBufferObject, Vertex> pipeline; /// pipeline for single object scene
+        Pipeline pipeline; /// pipeline for single object scene
 
         static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
             auto *i = (HelloTriangleApplication::impl*)(glfwGetWindowUserPointer(window));
@@ -96,7 +96,7 @@ struct HelloTriangleApplication:mx {
             glfwSetWindowUserPointer(gpu->window, this);
             glfwSetFramebufferSizeCallback(gpu->window, framebufferResizeCallback);
             device = Device::create(gpu);
-            pipeline = Pipeline<UniformBufferObject, Vertex>(device, "disney", MODEL_NAME);
+            pipeline = Pipeline(GraphicsDevice<UniformBufferObject, Vertex>(&device), "disney", MODEL_NAME);
         }
 
         /// run app (main loop, wait for idle)

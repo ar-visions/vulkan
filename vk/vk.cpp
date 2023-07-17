@@ -1154,25 +1154,101 @@ Texture Texture::load(Device &dev, symbol name, Asset type) {
     return tx;
 }
 
-void PipelineData::impl::start(symbol shader, symbol model) {
-    // compile .spv on load if its not there
-    static lambda<void(bool, array<path_op> &)> rld;
-    
-    rld = [data=this](bool first, array<path_op> &ops) {
-        printf("reloading...");
-        data->reload();
-    };
-    // watch watch::spawn(array<path> paths, array<str> exts, states<path::option> options, watch::fn watch_fn
-    // lambda<void(bool, array<path_op> &)>
-    array<path> paths;
-    paths += path("./shaders");
-    paths += path("./textures");
-    paths += path("./models");
+void Pipeline::impl::createUniformBuffers() {
+    VkDeviceSize bufferSize = gfx->u_type->base_sz; /// was UniformBufferObject
 
-    watcher = watch::spawn(paths, {".frag", ".vert", ".png", ".obj"}, {}, rld);
+    uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+    uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        device->createBuffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            uniformBuffers[i], uniformBuffersMemory[i]);
+        vkMapMemory(device, uniformBuffersMemory[i], 0, bufferSize, 0,
+            &uniformBuffersMapped[i]);
+    }
 }
 
-void PipelineData::impl::cleanup() {
+VkVertexInputBindingDescription Pipeline::impl::getBindingDescription() {
+    VkVertexInputBindingDescription bindingDescription{};
+    bindingDescription.binding   = 0;
+    bindingDescription.stride    = gfx->v_type->base_sz;
+    bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    return bindingDescription;
+}
+
+std::vector<VkVertexInputAttributeDescription> Pipeline::impl::getAttributeDescriptions() {
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+    size_t        index = 0;
+    doubly<prop> &props = *(doubly<prop>*)gfx->v_type->meta;
+    attributeDescriptions.resize(props->len());
+
+    auto get_format = [](prop &p) {
+        if (p.member_type == typeof(vec2f)) return VK_FORMAT_R32G32_SFLOAT;
+        if (p.member_type == typeof(vec3f)) return VK_FORMAT_R32G32B32_SFLOAT;
+        if (p.member_type == typeof(vec4f)) return VK_FORMAT_R32G32B32A32_SFLOAT;
+        if (p.member_type == typeof(float)) return VK_FORMAT_R32_SFLOAT;
+        return VK_FORMAT_UNDEFINED;
+    };
+
+    for (prop &p: props) {
+        attributeDescriptions[index].binding  = 0;
+        attributeDescriptions[index].location = index;
+        attributeDescriptions[index].format   = get_format(p);
+        attributeDescriptions[index].offset   = p.offset;
+        index++;
+    }
+
+    return attributeDescriptions;
+}
+
+void Pipeline::impl::start() {
+    /// if we are not debugging, load pipeline and never 'reload' again
+    /// (we expect resources to be in .spv form)
+    if (!is_debug()) {
+        reload();
+        init = true;
+    } else {
+        // while debugging we can adjust resources at runtime
+        // compile .spv on load if its not there
+        static lambda<void(bool, array<path_op> &)> rld;
+        
+        /// if there are no files it doesnt load, or reload.. thats kind of not a bug
+        rld = [data=this](bool first, array<path_op> &ops) {
+            printf("compiling shaders");
+            for (path_op &op: ops) {
+                str ext = op->path.ext4();
+                /// compile all .vert and .frag files
+                /// if this is startup, all are given and we want to do that anyway
+                if (ext == ".vert" || ext == ".frag") {
+                    str s_path = op->path;
+                    exec glslc = fmt { "glslc {0} -o {0}.spv", { s_path }};
+                    int code = int(async(glslc).sync()[0]); /// these return an array of data processed
+                    console.test(code == 0, "shader failed to compile: {0}", { s_path });
+                }
+            }
+            /// if we already loaded before, cleanup resources
+            data->device->mtx.lock();
+            if (data->init)
+                data->cleanup();
+
+            /// perform reload
+            data->reload();
+            data->init = true;
+            data->device->mtx.unlock();
+        };
+
+        /// spawn watcher
+        watcher = watch::spawn(
+            {"./shaders", "./textures", "./models"},
+            {".frag", ".vert", ".png", ".obj"},
+            {},
+            rld);
+    }
+}
+
+void Pipeline::impl::cleanup() {
     vkDestroyPipeline(device, graphicsPipeline, null);
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -1184,6 +1260,9 @@ void PipelineData::impl::cleanup() {
     for (int i = 1; i < Asset::count; i++)
         textures[i - 1] = Texture();
 
+    vkFreeDescriptorSets(device, device->descriptorPool,
+        uint32_t(descriptorSets.size()), descriptorSets.data());
+
     vkDestroyDescriptorSetLayout (device, descriptorSetLayout,  null);
     vkDestroyBuffer              (device, indexBuffer,          null);
     vkFreeMemory                 (device, indexBufferMemory,    null);
@@ -1192,11 +1271,12 @@ void PipelineData::impl::cleanup() {
     vkDestroyPipelineLayout      (device, pipelineLayout,       null);
 }
 
-PipelineData::impl::~impl() {
+Pipeline::impl::~impl() {
     cleanup();
+    gmem->drop();
 }
 
-std::vector<char> PipelineData::impl::readFile(symbol filename) {
+std::vector<char> Pipeline::impl::readFile(symbol filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
     if (!file.is_open()) {
@@ -1214,7 +1294,27 @@ std::vector<char> PipelineData::impl::readFile(symbol filename) {
     return buffer;
 }
 
-VkShaderModule PipelineData::impl::createShaderModule(const std::vector<char>& code) {
+void Pipeline::impl::createIndexBuffer(std::vector<uint32_t> &indices) {
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+
+    device->createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer, stagingBufferMemory);
+    
+    void* vdata;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &vdata);
+        memcpy(vdata, indices.data(), (size_t) bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+    
+    device->createBuffer(bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        indexBuffer, indexBufferMemory);
+    device->copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+VkShaderModule Pipeline::impl::createShaderModule(const std::vector<char>& code) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = code.size();
@@ -1228,11 +1328,11 @@ VkShaderModule PipelineData::impl::createShaderModule(const std::vector<char>& c
     return shaderModule;
 }
 
-void PipelineData::impl::createGraphicsPipeline() {
+void Pipeline::impl::createGraphicsPipeline() {
     char vert[64];
     char frag[64];
-    snprintf(vert, sizeof(vert), "shaders/%s.vert.spv", shader);
-    snprintf(frag, sizeof(frag), "shaders/%s.frag.spv", shader);
+    snprintf(vert, sizeof(vert), "shaders/%s.vert.spv", gfx->shader);
+    snprintf(frag, sizeof(frag), "shaders/%s.frag.spv", gfx->shader);
 
     auto vertShaderCode = readFile(vert);
     auto fragShaderCode = readFile(frag);
@@ -1356,7 +1456,7 @@ void PipelineData::impl::createGraphicsPipeline() {
 
 
 // fix this, get this working; its basically a duplicate of 
-void PipelineData::impl::createDescriptorSetLayout() {
+void Pipeline::impl::createDescriptorSetLayout() {
     VkDescriptorSetLayoutBinding layoutBinding[1 + Asset::count - 1];
     memset(&layoutBinding, 0, sizeof(layoutBinding));
 
@@ -1386,7 +1486,7 @@ void PipelineData::impl::createDescriptorSetLayout() {
 }
 
 /// get this working, test this
-void PipelineData::impl::createDescriptorSets() {
+void Pipeline::impl::createDescriptorSets() {
     std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
     VkDescriptorSetAllocateInfo allocInfo {};
     allocInfo.sType                 = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -1400,10 +1500,10 @@ void PipelineData::impl::createDescriptorSets() {
     }
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
+        VkDescriptorBufferInfo bufferInfo {};
         bufferInfo.buffer = uniformBuffers[i];
         bufferInfo.offset = 0;
-        bufferInfo.range = uniformSize;//sizeof(UniformBufferObject);
+        bufferInfo.range  = gfx->u_type->base_sz;//sizeof(UniformBufferObject);
 
         std::array<VkWriteDescriptorSet, 1 + Asset::count - 1> descriptorWrites { };
         descriptorWrites[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1436,9 +1536,7 @@ void PipelineData::impl::createDescriptorSets() {
     }
 }
 
-void PipelineData::updateUniformBuffer() { }
-
-void PipelineData::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
+void Pipeline::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
@@ -1454,7 +1552,7 @@ void PipelineData::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint
     renderPassInfo.renderArea.extent = device->swapChainExtent;
 
     std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {{0.0f, 0.02f, 0.01f, 1.0f}};
+    clearValues[0].color = {{0.01f, 0.01f, 0.01f, 1.0f}};
     clearValues[1].depthStencil = {1.0f, 0};
 
     renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
@@ -1481,11 +1579,8 @@ void PipelineData::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-
         vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[device->currentFrame], 0, nullptr);
-
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indicesSize), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
@@ -1496,7 +1591,7 @@ void PipelineData::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint
 }
 
 
-void Device::impl::drawFrame(PipelineData &pipeline) {
+void Device::impl::drawFrame(Pipeline &pipeline) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -1509,7 +1604,7 @@ void Device::impl::drawFrame(PipelineData &pipeline) {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    pipeline.updateUniformBuffer();
+    pipeline->uniform_update();
 
     vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
