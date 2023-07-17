@@ -1145,7 +1145,7 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
 
 Texture Texture::load(Device &dev, symbol name, Asset type) {
     Texture tx;
-    ion::path path = fmt {"textures/{0}.{1}.png", { str(name), str(type.symbol()) }};
+    ion::path path = fmt {"textures/{0}.{1}.png", { name, type.symbol() }};
     assert(path.exists());
     tx->device = dev;
     tx->create_image(path, type);

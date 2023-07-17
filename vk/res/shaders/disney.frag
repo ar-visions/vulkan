@@ -1,12 +1,12 @@
 #version 450
 
-#define MAX_PBR_LIGHTS 3
+#define MAX_PBR_LIGHTS 1
 
 layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
     mat4 proj;
-    vec4 light_pos [MAX_PBR_LIGHTS];
+    vec4 light_dir [MAX_PBR_LIGHTS];
     vec4 light_rgba[MAX_PBR_LIGHTS];
 } ubo;
 
@@ -23,18 +23,23 @@ layout(binding = 3) uniform sampler2D tx_material;
 void main() {
     vec3  color       = texture(tx_color, in_uv).rgb;
     vec3  normal      = normalize(texture(tx_normal, in_uv).rgb * 2.0 - 1.0);
+    
+    vec3 T   = cross(in_normal, vec3(0.0, 0.0, 1.0));
+    vec3 B   = cross(T, in_normal);
+    mat3 TBN = mat3(T, B, in_normal);
+    vec3 N   = normalize(TBN * normal);
+    
     vec3  material    = texture(tx_material, in_uv).rgb;
-    float metallic    = material.r;
-    float roughness   = material.g;
-    float ao          = material.b;
-    vec3  N           = normalize( in_normal);
+    float metallic    = 0.5;//material.r;
+    float roughness   = 0.5;//material.g;
+    float ao          = 1.0;//material.b;
     vec3  V           = normalize(-in_pos);
-    vec3  total_light = vec3(0.0);
+    vec3  total_light = vec3(0.01);
 
     for (int i = 0; i < MAX_PBR_LIGHTS; ++i) {
         vec3  light    = ubo.light_rgba[i].rgb * ubo.light_rgba[i].a;
 
-        vec3  L        = normalize(ubo.light_pos[i].xyz - in_pos);
+        vec3  L        = normalize(ubo.light_dir[i].xyz);
         vec3  H        = normalize(V + L);
 
         float NdotL    = max(dot(N, L), 0.0);
@@ -56,7 +61,6 @@ void main() {
         total_light   += (diffuseBRDF + specularBRDF * specular) * light;
     }
 
-    vec3 ambient       = color * ao;
-    vec3 final_color   = ambient + total_light;
-    pixel              = vec4(ambient, 1.0);//vec4(0.0, 0.0, ao, 1.0);//vec4(final_color, 1.0);
+    vec3 final_color   = color * ao * total_light;
+    pixel              = vec4(final_color, 1.0);
 }

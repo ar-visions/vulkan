@@ -6,7 +6,7 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
     mat4 view;
     mat4 proj;
-    vec3 light_pos [MAX_PBR_LIGHTS];
+    vec3 light_dir [MAX_PBR_LIGHTS];
     vec4 light_rgba[MAX_PBR_LIGHTS];
 } ubo;
 
