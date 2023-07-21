@@ -1,4 +1,4 @@
-dep(mx:mx mx:watch glm:glm_static glfw:glfw3 vulkan)
+dep(mx:mx mx:image mx:watch glm:glm_static glfw:glfw3 vulkan)
 
 if(mac)
     dep(IOSurface QuartzCore Metal AppKit CoreGraphics CoreFoundation Cocoa IOKit)

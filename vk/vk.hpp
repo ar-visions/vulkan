@@ -10,7 +10,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
 
-#include <vk/stb_image.h>
 #include <vk/tiny_obj_loader.h>
 
 #include <mx/mx.hpp>
@@ -52,6 +51,7 @@ struct Vulkan:mx {
         int v_minor = 0;
         void init();
         ~impl();
+        VkInstance inst();
         bool check_validation();
         std::vector<symbol> getRequiredExtensions();
         operator bool();
@@ -79,6 +79,8 @@ struct Pipeline;
 /// we need more key handlers
 using ResizeFn = void(*)(vec2i&, void*);
 
+struct Texture;
+
 struct GPU:mx {
     struct impl {
         VkPhysicalDevice        phys        = VK_NULL_HANDLE;
@@ -91,6 +93,7 @@ struct GPU:mx {
         ResizeFn                resize;
         vec2i                   sz;
 
+        VkSampleCountFlagBits getUsableSampling(VkSampleCountFlagBits max);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
         static void framebuffer_resized(GLFWwindow *, int, int);
@@ -98,11 +101,11 @@ struct GPU:mx {
         ~impl();
         operator bool() { return phys != VK_NULL_HANDLE; }
         type_register(impl);
+
+        Texture &texture(vec2i sz);
     };
 
     operator VkPhysicalDevice();
-
-    VkSampleCountFlagBits getUsableSampling(VkSampleCountFlagBits max);
 
     static GLFWwindow *initWindow(vec2i &sz);
     
@@ -195,7 +198,45 @@ struct Device:mx {
     mx_object(Device, mx, impl);
 };
 
-enums(Asset, undefined, "undefined, color, normal, material", undefined, color, normal, material);
+enums(Asset, undefined, 
+    "undefined, color, normal, material, reflect",
+     undefined, color, normal, material, reflect);
+
+enums(VA, Position,
+    "Position, Normal, UV, Color, Tangent, BiTangent",
+     Position, Normal, UV, Color, Tangent, BiTangent);
+
+enums(Rendition, none,
+    "none, shader, wireframe",
+     none, shader, wireframe);
+
+enums(ShadeModule, undefined,
+    "undefined, vertex, fragment, compute",
+     undefined, vertex, fragment, compute);
+
+/// this is not actually needed in our current model of Vertex, as it uses the meta()
+/// just comment and deprecate
+using VAttribs = states<VA>;
+
+/// never support 16bit indices for obvious reasons.  you do 1 cmclark section too many and there it goes
+struct ngon {
+    size_t size;
+    u32   *indices;
+};
+
+using vpair = std::pair<int, int>;
+
+struct vpair_hash {
+    std::size_t operator()(const vpair& p) const {
+        return std::hash<int>()(p.first) ^ std::hash<int>()(p.second);
+    }
+};
+
+using mesh  = array<ngon>;
+
+//using u32   = uint32_t;
+
+using face  = ngon;
 
 struct Texture:mx {
     struct impl {
@@ -208,10 +249,12 @@ struct Texture:mx {
         int             height;
         ion::path       path;
         Asset           asset_type;
+        VkFormat        format;
 
         void create_image_view();
         void create_sampler();
         void create_image(ion::path texture_path, Asset type);
+        void create_image(vec2i sz);
         ~impl();
         operator bool() { return image != VK_NULL_HANDLE; }
         type_register(impl);

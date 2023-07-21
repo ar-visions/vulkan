@@ -1,7 +1,6 @@
 #include <vk/vk.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include <vk/stb_image.h>
+#include <image/image.hpp>
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <vk/tiny_obj_loader.h>
@@ -162,6 +161,10 @@ void Vulkan::impl::init() {
     }
 }
 
+VkInstance Vulkan::impl::inst() {
+    return instance;
+}
+
 Vulkan::impl::operator bool() {
     return instance != VK_NULL_HANDLE;
 }
@@ -178,9 +181,9 @@ GPU::operator VkPhysicalDevice() {
     return data->phys;
 }
 
-VkSampleCountFlagBits GPU::getUsableSampling(VkSampleCountFlagBits max) {
+VkSampleCountFlagBits GPU::impl::getUsableSampling(VkSampleCountFlagBits max) {
     VkPhysicalDeviceProperties physicalDeviceProperties;
-    vkGetPhysicalDeviceProperties(data->phys, &physicalDeviceProperties);
+    vkGetPhysicalDeviceProperties(phys, &physicalDeviceProperties);
 
     VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
     if ((max >= VK_SAMPLE_COUNT_64_BIT) && (counts & VK_SAMPLE_COUNT_64_BIT)) { return VK_SAMPLE_COUNT_64_BIT; }
@@ -322,7 +325,7 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
         g->indices = findQueueFamilies(phys, g->surface);
         if (isDeviceSuitable(phys, g->surface, g->indices, g->details)) {
             g->phys        = phys;
-            g->msaaSamples = g.getUsableSampling(VK_SAMPLE_COUNT_8_BIT);
+            g->msaaSamples = g->getUsableSampling(VK_SAMPLE_COUNT_8_BIT);
             break;
         }
     }
@@ -1099,15 +1102,64 @@ void Texture::impl::create_sampler() {
     }
 }
 
+Texture &GPU::impl::texture(vec2i sz) {
+    static Texture tx = Texture();
+    tx->create_image(sz);
+    tx->create_image_view();
+    tx->create_sampler();
+    return tx;
+}
+
 void Texture::impl::create_image(ion::path texture_path, Asset type) {
-    int texWidth, texHeight, texChannels = 4;
-    stbi_uc* pixels = stbi_load((symbol)texture_path.cs(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = texWidth * texHeight * 4;
-    device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(texWidth, texHeight)))) + 1;
+    format = VK_FORMAT_R8G8B8A8_SRGB;
+    ion::image img = ion::image(texture_path);
+    ion::rgba8 *pixels = img.data;
+    vec2i sz = { img.width(), img.height() };
+    size_t image_size = sz.x * sz.y * 4;
+    device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(sz.x, sz.y)))) + 1;
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    device->createBuffer(image_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer, stagingBufferMemory);
+
+    void* vdata;
+    vkMapMemory(device, stagingBufferMemory, 0, image_size, 0, &vdata);
+        memcpy(vdata, pixels, static_cast<size_t>(image_size));
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    device->createImage(sz.x, sz.y, device->mipLevels,
+        VK_SAMPLE_COUNT_1_BIT, format, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        image, memory);
+
+    device->transitionImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        device->mipLevels);
+    device->copyBufferToImage(stagingBuffer, image, static_cast<uint32_t>(sz.x), static_cast<uint32_t>(sz.y));
+    //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+
+    /// we dont always want to do this; parameterize
+    device->generateMipmaps(image, format, sz.x, sz.y, device->mipLevels);
+    width      = sz.x;
+    height     = sz.y;
+    asset_type = type;
+}
+
+/// needs a format specifier
+void Texture::impl::create_image(vec2i sz) {
+    format = VK_FORMAT_R8G8B8A8_SRGB;
+    int texWidth = sz.x, texHeight = sz.y, texChannels = 4;
+    VkDeviceSize imageSize = sz.x * sz.y * 4;
+    device->mipLevels = 1;
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -1116,19 +1168,12 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         stagingBuffer, stagingBufferMemory);
 
-    void* vdata;
-    vkMapMemory(device, stagingBufferMemory, 0, imageSize, 0, &vdata);
-        memcpy(vdata, pixels, static_cast<size_t>(imageSize));
-    vkUnmapMemory(device, stagingBufferMemory);
-
-    stbi_image_free(pixels);
-
     device->createImage(texWidth, texHeight, device->mipLevels,
-        VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+        VK_SAMPLE_COUNT_1_BIT, format, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         image, memory);
 
-    device->transitionImageLayout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    device->transitionImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         device->mipLevels);
     device->copyBufferToImage(stagingBuffer, image, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
     //transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating mipmaps
@@ -1136,11 +1181,9 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 
-    /// we dont always want to do this; parameterize
-    device->generateMipmaps(image, VK_FORMAT_R8G8B8A8_SRGB, texWidth, texHeight, device->mipLevels);
+    //device->generateMipmaps(image, format, texWidth, texHeight, device->mipLevels);
     width = texWidth;
     height = texHeight;
-    asset_type = type;
 }
 
 Texture Texture::load(Device &dev, symbol name, Asset type) {
@@ -1590,7 +1633,6 @@ void Pipeline::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
     }
 }
 
-
 void Device::impl::drawFrame(Pipeline &pipeline) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
@@ -1655,4 +1697,136 @@ void Device::impl::drawFrame(Pipeline &pipeline) {
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+/// test this later!
 
+vec3f average_verts(face& f, array<vec3f>& verts) {
+    vec3f sum(0.0f);
+    for (size_t i = 0; i < f.size; ++i)
+        sum += verts[f.indices[i]];
+    return sum / r32(f.size);
+}
+
+mesh subdiv(mesh& input_mesh, array<vec3f>& verts) {
+    mesh sdiv_mesh;
+    std::unordered_map<vpair, vec3f, vpair_hash> face_points;
+    std::unordered_map<vpair, vec3f, vpair_hash> edge_points;
+    array<vec3f> new_verts = verts;
+    const size_t vlen = verts.len();
+
+    /// Compute face points
+    for (face& f: input_mesh) {
+        vec3f face_point = average_verts(f, verts);
+        for (u32 i = 0; i < f.size; ++i) {
+            int vertex_index1 = f.indices[i];
+            int vertex_index2 = f.indices[(i + 1) % f.size];
+            vpair edge(vertex_index1, vertex_index2);
+            face_points[edge] = face_point;
+        }
+    }
+
+    /// Compute edge points
+    for (auto& fp: face_points) {
+        const  vpair &edge = fp.first;
+        vec3f       midpoint = (verts[edge.first] + verts[edge.second]) / 2.0f;
+        vec3f face_point_avg = (face_points[edge] + face_points[vpair(edge.second, edge.first)]) / 2.0f;
+        ///
+        edge_points[edge]  = (midpoint + face_point_avg) / 2.0f;
+    }
+
+    /// Update original verts
+    for (size_t i = 0; i < verts.len(); ++i) {
+        vec3f sum_edge_points(0.0f);
+        vec3f sum_face_points(0.0f);
+        u32 n = 0;
+
+        for (const auto& ep : edge_points) {
+            vpair edge = ep.first;
+            if (edge.first == i || edge.second == i) {
+                sum_edge_points += ep.second;
+                sum_face_points += face_points[edge];
+                n++;
+            }
+        }
+
+        vec3f avg_edge_points = sum_edge_points / r32(n);
+        vec3f avg_face_points = sum_face_points / r32(n);
+        vec3f original_vertex = verts[i];
+
+        new_verts[i] = (avg_face_points + avg_edge_points * 2.0f + original_vertex * (n - 3.0f)) / r32(n);
+    }
+
+    /// create new faces
+    for (const face& f : input_mesh) {
+        
+        /// for each vertex in face
+        for (u32 i = 0; i < f.size; ++i) {
+            face new_face;
+            new_face.size = 4;
+            u32 new_indices[4];
+
+            new_indices[0] = f.indices[i];
+            new_indices[1] = u32(vlen + std::distance(edge_points.begin(), edge_points.find(vpair(f.indices[i], f.indices[(i + 1) % f.size]))));
+            new_indices[2] = u32(vlen + std::distance(edge_points.begin(), edge_points.find(vpair(f.indices[(i + 1) % f.size], f.indices[(i + 2) % f.size]))));
+            new_indices[3] = u32(vlen + std::distance(edge_points.begin(), edge_points.find(vpair(f.indices[(i + 2) % f.size], f.indices[i]))));
+
+            new_face.indices = new_indices;
+            sdiv_mesh       += new_face;
+        }
+    }
+
+    return sdiv_mesh;
+}
+
+mesh subdiv_cube() {
+    array<vec3f> verts = {
+        // Front face
+        { -0.5f, -0.5f,  0.5f },
+        {  0.5f, -0.5f,  0.5f },
+        {  0.5f,  0.5f,  0.5f },
+        { -0.5f,  0.5f,  0.5f },
+
+        // Back face
+        { -0.5f, -0.5f, -0.5f },
+        { -0.5f,  0.5f, -0.5f },
+        {  0.5f,  0.5f, -0.5f },
+        {  0.5f, -0.5f, -0.5f },
+
+        // Top face
+        { -0.5f,  0.5f, -0.5f },
+        { -0.5f,  0.5f,  0.5f },
+        {  0.5f,  0.5f,  0.5f },
+        {  0.5f,  0.5f, -0.5f },
+
+        // Bottom face
+        { -0.5f, -0.5f, -0.5f },
+        {  0.5f, -0.5f, -0.5f },
+        {  0.5f, -0.5f,  0.5f },
+        { -0.5f, -0.5f,  0.5f },
+
+        // Right face
+        {  0.5f, -0.5f, -0.5f },
+        {  0.5f,  0.5f, -0.5f },
+        {  0.5f,  0.5f,  0.5f },
+        {  0.5f, -0.5f,  0.5f },
+
+        // Left face
+        { -0.5f, -0.5f, -0.5f },
+        { -0.5f, -0.5f,  0.5f },
+        { -0.5f,  0.5f,  0.5f },
+        { -0.5f,  0.5f, -0.5f }
+    };
+
+    mesh input_mesh = {
+        /* Size: */ 24,
+        /* Indices: */ {
+            0,  1,  2,  0,  2,  3,  // Front face
+            4,  5,  6,  4,  6,  7,  // Back face
+            8,  9,  10, 8,  10, 11, // Top face
+            12, 13, 14, 12, 14, 15, // Bottom face
+            16, 17, 18, 16, 18, 19, // Right face
+            20, 21, 22, 20, 22, 23  // Left face
+        }
+    };
+
+    return subdiv(input_mesh, verts);
+}

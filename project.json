@@ -19,6 +19,25 @@
             "version":  "3.3.8",
             "commit":   "7482de6",
             "url":      "https://github.com/glfw/glfw"
+        },
+        {
+            "name":     "freetype",
+            "version":  "2.13.0",
+            "commit":   "4d8db130ea4342317581bab65fc96365ce806b77",
+            "url":      "https://github.com/freetype/freetype",
+            "cmake": {
+                "args": ["-DFT_DISABLE_BROTLI=Yes"],
+                "path": "."
+            }
+        },
+        {
+            "name":     "harfbuzz",
+            "version":  "7.3.0",
+            "commit":   "4584bcd",
+            "url":      "https://github.com/harfbuzz/harfbuzz",
+            "cmake":    {
+                "args": ["-DHB_HAVE_FREETYPE=Yes"]
+            }
         }
     ]
 }
