@@ -304,7 +304,8 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     GPU g = GPU();
 
     g->window = initWindow(sz);
-
+    g->sz = sz;
+    
     Vulkan vk; /// singleton; if constructed prior with a version, that remains set
     vk->init();
 
