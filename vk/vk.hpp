@@ -80,6 +80,7 @@ struct Pipeline;
 using ResizeFn = void(*)(vec2i&, void*);
 
 struct Texture;
+struct Device;
 
 struct GPU:mx {
     struct impl {
@@ -102,7 +103,8 @@ struct GPU:mx {
         operator bool() { return phys != VK_NULL_HANDLE; }
         type_register(impl);
 
-        Texture &texture(vec2i sz);
+        Texture &texture(Device &dev, vec2i sz, bool sampling,
+            VkImageUsageFlagBits usage = (VkImageUsageFlagBits)(VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT));
     };
 
     operator VkPhysicalDevice();
@@ -135,6 +137,7 @@ struct Device:mx {
         VkSwapchainKHR              swapChain;
         std::vector<VkImage>        swapChainImages;
         VkFormat                    swapChainImageFormat;
+        VkFormat                    textureFormat;
         VkExtent2D                  swapChainExtent;
         std::vector<VkImageView>    swapChainImageViews;
         std::vector<VkFramebuffer>  swapChainFramebuffers;
@@ -147,9 +150,11 @@ struct Device:mx {
         VkImage                     depthImage;
         VkDeviceMemory              depthImageMemory;
         VkImageView                 depthImageView;
+        VkSemaphore                 semaphore;
         bool                        framebufferResized;
         uint32_t                    mipLevels;
         std::mutex                  mtx;
+        VkPhysicalDeviceFeatures    supported;
 
         std::vector<VkCommandBuffer> commandBuffers;
 
@@ -158,7 +163,7 @@ struct Device:mx {
         std::vector<VkFence>        inFlightFences;
         uint32_t                    currentFrame = 0;
 
-        void drawFrame(Pipeline &pipeline);
+        void drawFrame(array<Pipeline> &pipelines);
         void recreateSwapChain();
         void createDescriptorPool();
         void createFramebuffers();
@@ -188,6 +193,7 @@ struct Device:mx {
         void createRenderPass();
         void cleanupSwapChain();
         ~impl();
+        void loop(lambda<void(array<Pipeline>&)>);
         operator bool() { return device != VK_NULL_HANDLE; }
         type_register(impl);
     };
@@ -241,19 +247,22 @@ using face  = ngon;
 struct Texture:mx {
     struct impl {
         Device          device;
+        VkImageUsageFlagBits usage;
+        VkFormat        format;
         VkImage         image;
         VkDeviceMemory  memory;
         VkImageView     view;
         VkSampler       sampler;
+        VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
         int             width;
         int             height;
         ion::path       path;
         Asset           asset_type;
-        VkFormat        format;
+        vec2i           sz;
 
         void create_image_view();
         void create_sampler();
-        void create_image(ion::path texture_path, Asset type);
+        void create_image(ion::path texture_path, Asset type); // VK_FORMAT_R8G8B8A8_SRGB
         void create_image(vec2i sz);
         ~impl();
         operator bool() { return image != VK_NULL_HANDLE; }
@@ -322,9 +331,7 @@ struct Pipeline:mx {
 
         ~impl();
 
-        static std::vector<char> readFile(symbol filename);
-
-        VkShaderModule createShaderModule(const std::vector<char>& code);
+        VkShaderModule createShaderModule(const array<char>& code);
 
         void createDescriptorSetLayout();
         void createDescriptorSets();

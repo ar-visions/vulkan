@@ -121,9 +121,9 @@ void Vulkan::impl::init() {
 
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName   = "ion:cgi";
+    appInfo.pApplicationName   = "ion:vk";
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName        = "ion:cgi";
+    appInfo.pEngineName        = "ion:vk";
     appInfo.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion         = VK_MAKE_VERSION(v_major, v_minor, 0);
 
@@ -306,7 +306,7 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     g->window = initWindow(sz);
     g->sz = sz;
     
-    Vulkan vk; /// singleton; if constructed prior with a version, that remains set
+    Vulkan vk { 1, 2 }; /// singleton; if constructed prior with a version, that remains set
     vk->init();
 
     if (glfwCreateWindowSurface(instance, g->window, nullptr, &g->surface) != VK_SUCCESS) {
@@ -853,6 +853,13 @@ void Device::impl::createLogicalDevice() {
 
     VkPhysicalDeviceFeatures deviceFeatures{};
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    
+    vkGetPhysicalDeviceFeatures(gpu->phys, &supported);
+
+    /// for use with vkvg:
+    deviceFeatures.fillModeNonSolid	 = supported.fillModeNonSolid;
+	deviceFeatures.sampleRateShading = supported.sampleRateShading;
+	deviceFeatures.logicOp			 = supported.logicOp;
 
     VkDeviceCreateInfo createInfo {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -1014,6 +1021,7 @@ void Device::impl::createRenderPass() {
 Device Device::create(GPU &gpu) {
     Device dev;
     dev->gpu = gpu;
+    dev->textureFormat = VK_FORMAT_B8G8R8A8_UNORM; /// i dont really wnat to make this an argument.  lots are unsupported and i want to support vkvg's generic
     dev->createLogicalDevice();
     dev->createSwapChain();
     dev->createImageViews();
@@ -1073,7 +1081,7 @@ Texture::impl::~impl() {
 
 void Texture::impl::create_image_view() {
     view = device->createImageView(
-        image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, device->mipLevels);
+        image, device->textureFormat, VK_IMAGE_ASPECT_COLOR_BIT, device->mipLevels); // VK_FORMAT_R8G8B8A8_SRGB
 }
 
 void Texture::impl::create_sampler() {
@@ -1103,16 +1111,37 @@ void Texture::impl::create_sampler() {
     }
 }
 
-Texture &GPU::impl::texture(vec2i sz) {
+void Device::impl::loop(lambda<void(array<Pipeline>&)> select) {
+    array<Pipeline> pipelines;
+    while (!glfwWindowShouldClose(gpu->window)) {
+        /// user events fire off (events are processed by the user)
+        glfwPollEvents();
+
+        /// the user selects pipelines
+        select(pipelines);
+
+        /// we draw pipelines
+        drawFrame(pipelines);
+
+        /// we then reset for next frame
+        pipelines.destruct();
+    }
+    vkDeviceWaitIdle(device);
+}
+
+Texture &GPU::impl::texture(Device &dev, vec2i sz, bool sampling, VkImageUsageFlagBits usage) {
     static Texture tx = Texture();
-    tx->create_image(sz);
+    tx->device = dev;
+    tx->format = dev->textureFormat;
+    tx->usage  = usage;
+    tx->msaaSamples = sampling ? dev->gpu->msaaSamples : VK_SAMPLE_COUNT_1_BIT;
+    tx->create_image(sz); /// better to use one texture format for textures, and one texture format for swap.
     tx->create_image_view();
     tx->create_sampler();
     return tx;
 }
 
 void Texture::impl::create_image(ion::path texture_path, Asset type) {
-    format = VK_FORMAT_R8G8B8A8_SRGB;
     ion::image img = ion::image(texture_path);
     ion::rgba8 *pixels = img.data;
     vec2i sz = { img.width(), img.height() };
@@ -1136,8 +1165,10 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
     vkUnmapMemory(device, stagingBufferMemory);
 
     device->createImage(sz.x, sz.y, device->mipLevels,
-        VK_SAMPLE_COUNT_1_BIT, format, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VK_SAMPLE_COUNT_1_BIT, format,
+        VK_IMAGE_TILING_OPTIMAL,
+        usage,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         image, memory);
 
     device->transitionImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -1156,10 +1187,9 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
 }
 
 /// needs a format specifier
-void Texture::impl::create_image(vec2i sz) {
-    format = VK_FORMAT_R8G8B8A8_SRGB;
-    int texWidth = sz.x, texHeight = sz.y, texChannels = 4;
-    VkDeviceSize imageSize = sz.x * sz.y * 4;
+void Texture::impl::create_image(vec2i size) {
+    int texWidth = size.x, texHeight = size.y, texChannels = 4;
+    VkDeviceSize imageSize = size.x * size.y * 4;
     device->mipLevels = 1;
 
     VkBuffer stagingBuffer;
@@ -1170,9 +1200,8 @@ void Texture::impl::create_image(vec2i sz) {
         stagingBuffer, stagingBufferMemory);
 
     device->createImage(texWidth, texHeight, device->mipLevels,
-        VK_SAMPLE_COUNT_1_BIT, format, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        image, memory);
+        msaaSamples, format, VK_IMAGE_TILING_OPTIMAL,
+        usage, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
     device->transitionImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         device->mipLevels);
@@ -1183,8 +1212,9 @@ void Texture::impl::create_image(vec2i sz) {
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 
     //device->generateMipmaps(image, format, texWidth, texHeight, device->mipLevels);
-    width = texWidth;
+    width  = texWidth;
     height = texHeight;
+    sz     = size;
 }
 
 Texture Texture::load(Device &dev, symbol name, Asset type) {
@@ -1192,6 +1222,7 @@ Texture Texture::load(Device &dev, symbol name, Asset type) {
     ion::path path = fmt {"textures/{0}.{1}.png", { name, type.symbol() }};
     assert(path.exists());
     tx->device = dev;
+    tx->format = dev->swapChainImageFormat;
     tx->create_image(path, type);
     tx->create_image_view();
     tx->create_sampler();
@@ -1320,24 +1351,6 @@ Pipeline::impl::~impl() {
     gmem->drop();
 }
 
-std::vector<char> Pipeline::impl::readFile(symbol filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        throw std::runtime_error("failed to open file!");
-    }
-
-    size_t fileSize = (size_t) file.tellg();
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-
-    file.close();
-
-    return buffer;
-}
-
 void Pipeline::impl::createIndexBuffer(std::vector<uint32_t> &indices) {
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
     VkBuffer stagingBuffer;
@@ -1358,11 +1371,11 @@ void Pipeline::impl::createIndexBuffer(std::vector<uint32_t> &indices) {
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
 
-VkShaderModule Pipeline::impl::createShaderModule(const std::vector<char>& code) {
+VkShaderModule Pipeline::impl::createShaderModule(const array<char>& code) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+    createInfo.codeSize = code.len();
+    createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data);
 
     VkShaderModule shaderModule;
     if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
@@ -1378,8 +1391,8 @@ void Pipeline::impl::createGraphicsPipeline() {
     snprintf(vert, sizeof(vert), "shaders/%s.vert.spv", gfx->shader);
     snprintf(frag, sizeof(frag), "shaders/%s.frag.spv", gfx->shader);
 
-    auto vertShaderCode = readFile(vert);
-    auto fragShaderCode = readFile(frag);
+    auto vertShaderCode = array<char>::read_file(vert);
+    auto fragShaderCode = array<char>::read_file(frag);
 
     VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
     VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -1581,13 +1594,6 @@ void Pipeline::impl::createDescriptorSets() {
 }
 
 void Pipeline::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
-    }
-
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = device->renderPass;
@@ -1628,13 +1634,9 @@ void Pipeline::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indicesSize), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
-    }
 }
 
-void Device::impl::drawFrame(Pipeline &pipeline) {
+void Device::impl::drawFrame(array<Pipeline>& pipelines) {
     vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex;
@@ -1647,12 +1649,22 @@ void Device::impl::drawFrame(Pipeline &pipeline) {
         throw std::runtime_error("failed to acquire swap chain image!");
     }
 
-    pipeline->uniform_update();
+    /// select command buffer for current frame, reset fences and command buffer
+    VkCommandBuffer cmd = commandBuffers[currentFrame];
+    VkFence       fence = inFlightFences[currentFrame];
+    vkResetFences(device, 1, &fence);
+    vkResetCommandBuffer(cmd, 0);
+    
+    VkCommandBufferBeginInfo bi { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    vkBeginCommandBuffer(cmd, &bi);
 
-    vkResetFences(device, 1, &inFlightFences[currentFrame]);
+    /// render pass for each pipeline
+    for (Pipeline &pipeline: pipelines) {
+        pipeline->uniform_update();
+        pipeline->recordCommandBuffer(cmd, imageIndex);
+    }
 
-    vkResetCommandBuffer(commandBuffers[currentFrame], /*VkCommandBufferResetFlagBits*/ 0);
-    pipeline->recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+    vkEndCommandBuffer(cmd);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1664,13 +1676,13 @@ void Device::impl::drawFrame(Pipeline &pipeline) {
     submitInfo.pWaitDstStageMask = waitStages;
 
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+    submitInfo.pCommandBuffers = &cmd;
 
     VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, fence) != VK_SUCCESS) {
         throw std::runtime_error("failed to submit draw command buffer!");
     }
 
