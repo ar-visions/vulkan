@@ -182,7 +182,8 @@ vk_engine_t* vkengine_create (VkPhysicalDeviceType preferedGPU, VkPresentModeKHR
 	glfwWindowHint(GLFW_DECORATED,  GLFW_TRUE);
 
 	e->window = glfwCreateWindow ((int)width, (int)height, "Window Title", NULL, NULL);
-
+	glfwShowWindow(e->window);
+	
 	VkSurfaceKHR surf;
 	VK_CHECK_RESULT (glfwCreateWindowSurface(e->app->inst, e->window, NULL, &surf))
 

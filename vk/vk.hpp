@@ -94,6 +94,7 @@ struct GPU:mx {
         void*                   user_data;
         ResizeFn                resize;
         vec2i                   sz;
+        VkPhysicalDeviceFeatures support;
 
         VkSampleCountFlagBits getUsableSampling(VkSampleCountFlagBits max);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -155,7 +156,6 @@ struct Device:mx {
         bool                        framebufferResized;
         uint32_t                    mipLevels;
         std::mutex                  mtx;
-        VkPhysicalDeviceFeatures    supported;
 
         std::vector<VkCommandBuffer> commandBuffers;
 

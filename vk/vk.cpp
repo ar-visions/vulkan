@@ -334,6 +334,8 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
 
+    vkGetPhysicalDeviceFeatures(g->phys, &g->support);
+
     /// we must fully isolate glfw here
     g->user_data = user_data;
     glfwSetWindowUserPointer(g->window, g.data);
@@ -850,21 +852,19 @@ void Device::impl::createLogicalDevice() {
         queueCreateInfos.push_back(queueCreateInfo);
     }
 
-    VkPhysicalDeviceFeatures deviceFeatures{};
-    deviceFeatures.samplerAnisotropy = VK_TRUE;
-    
-    vkGetPhysicalDeviceFeatures(gpu->phys, &supported);
-
-    /// for use with vkvg:
-    deviceFeatures.fillModeNonSolid	 = supported.fillModeNonSolid  ? VK_TRUE : VK_FALSE;
-	deviceFeatures.sampleRateShading = supported.sampleRateShading ? VK_TRUE : VK_FALSE;
-	deviceFeatures.logicOp			 = supported.logicOp           ? VK_TRUE : VK_FALSE;
+    /// set features used to mask of supported
+    VkPhysicalDeviceFeatures featured_used {
+        .samplerAnisotropy = gpu->support.samplerAnisotropy,
+        .fillModeNonSolid  = gpu->support.fillModeNonSolid,
+	    .sampleRateShading = gpu->support.sampleRateShading,
+	    .logicOp		   = gpu->support.logicOp
+    };
 
     VkDeviceCreateInfo createInfo {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size()),
         .pQueueCreateInfos       = queueCreateInfos.data(),
-        .pEnabledFeatures        = &deviceFeatures,
+        .pEnabledFeatures        = &featured_used,
         .enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size()),
         .ppEnabledExtensionNames = deviceExtensions.data()
     };

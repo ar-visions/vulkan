@@ -27,6 +27,7 @@ VkhPhyInfo vkh_phyinfo_create (VkPhysicalDevice phy, VkSurfaceKHR surface) {
 	VkhPhyInfo pi = (vkh_phy_t*)calloc(1, sizeof(vkh_phy_t));
 	pi->phy = phy;
 
+	vkGetPhysicalDeviceFeatures (phy, &pi->supportedFeatures);
 	vkGetPhysicalDeviceProperties (phy, &pi->properties);
 	vkGetPhysicalDeviceMemoryProperties (phy, &pi->memProps);
 
