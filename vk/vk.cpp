@@ -857,9 +857,9 @@ void Device::impl::createLogicalDevice() {
     vkGetPhysicalDeviceFeatures(gpu->phys, &supported);
 
     /// for use with vkvg:
-    deviceFeatures.fillModeNonSolid	 = supported.fillModeNonSolid;
-	deviceFeatures.sampleRateShading = supported.sampleRateShading;
-	deviceFeatures.logicOp			 = supported.logicOp;
+    deviceFeatures.fillModeNonSolid	 = supported.fillModeNonSolid  ? VK_TRUE : VK_FALSE;
+	deviceFeatures.sampleRateShading = supported.sampleRateShading ? VK_TRUE : VK_FALSE;
+	deviceFeatures.logicOp			 = supported.logicOp           ? VK_TRUE : VK_FALSE;
 
     VkDeviceCreateInfo createInfo {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -907,7 +907,8 @@ void Device::impl::createSwapChain() {
     createInfo.imageColorSpace = surfaceFormat.colorSpace;
     createInfo.imageExtent = extent;
     createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    
 
     QueueFamilyIndices &indices = gpu->indices;
     uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
@@ -1650,19 +1651,27 @@ void Device::impl::drawFrame(array<Pipeline>& pipelines) {
     }
 
     /// select command buffer for current frame, reset fences and command buffer
+    VkImage        image = swapChainImages[currentFrame];
     VkCommandBuffer cmd = commandBuffers[currentFrame];
     VkFence       fence = inFlightFences[currentFrame];
     vkResetFences(device, 1, &fence);
     vkResetCommandBuffer(cmd, 0);
-    
+
+    /// need another command buffer for presentation logic, or a 'Pipeline'
     VkCommandBufferBeginInfo bi { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     vkBeginCommandBuffer(cmd, &bi);
+
+    /// pre commands are run prior to pipelines
+    if (preCommands) preCommands(image, cmd);
 
     /// render pass for each pipeline
     for (Pipeline &pipeline: pipelines) {
         pipeline->uniform_update();
         pipeline->recordCommandBuffer(cmd, imageIndex);
     }
+
+    /// post commands are afterwards (gfx may want to blt vector image on the screen)
+    if (postCommands) postCommands(image, cmd);
 
     vkEndCommandBuffer(cmd);
 

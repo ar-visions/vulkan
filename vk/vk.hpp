@@ -163,6 +163,9 @@ struct Device:mx {
         std::vector<VkFence>        inFlightFences;
         uint32_t                    currentFrame = 0;
 
+        lambda<void(VkImage, VkCommandBuffer)> preCommands;
+        lambda<void(VkImage, VkCommandBuffer)> postCommands;
+
         void drawFrame(array<Pipeline> &pipelines);
         void recreateSwapChain();
         void createDescriptorPool();
