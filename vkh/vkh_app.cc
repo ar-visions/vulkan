@@ -19,6 +19,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <vk/vk.hpp>
 #include <vkh/vkh_app.h>
 
 #define ENGINE_NAME		"vkhelpers"
@@ -62,30 +63,14 @@ VkBool32 debugUtilsMessengerCallback (
 	return VK_FALSE;
 }
 
-VkhApp vkh_app_create (uint32_t version_major, uint32_t version_minor, const char* app_name, uint32_t enabledLayersCount, const char** enabledLayers, uint32_t ext_count, const char* extentions[]) {
+VkhApp vkh_app_create (uint32_t version_major, uint32_t version_minor, const char* app_name, uint32_t enabledLayersCount, const char** enabledLayers, uint32_t ext_count, const char* extensions[]) {
 	VkhApp app = (VkhApp)malloc(sizeof(vkh_app_t));
+    ion::Vulkan vk { version_major, version_minor }; /// singleton; if constructed prior with a version, that remains set
+    vk->init();
 
-	VkApplicationInfo infos = { .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-								.pApplicationName = app_name,
-								.applicationVersion = 1,
-								.pEngineName = ENGINE_NAME,
-								.engineVersion = ENGINE_VERSION,
-#ifdef VK_MAKE_API_VERSION
-								.apiVersion = VK_MAKE_API_VERSION (0, version_major, version_minor, 0)};
-#else
-								.apiVersion = VK_MAKE_VERSION (version_major, version_minor, 0)};
-#endif
-
-	VkInstanceCreateInfo inst_info = { .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-									   .pApplicationInfo = &infos,
-									   .enabledExtensionCount = ext_count,
-									   .ppEnabledExtensionNames = extentions,
-									   .enabledLayerCount = enabledLayersCount,
-									   .ppEnabledLayerNames = enabledLayers };
-
-	VK_CHECK_RESULT(vkCreateInstance (&inst_info, NULL, &app->inst));
-	app->infos = infos;
+	app->infos = vk->app_info;
 	app->debugMessenger = VK_NULL_HANDLE;
+	app->inst = vk->inst();
 	return app;
 }
 

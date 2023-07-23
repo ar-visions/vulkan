@@ -142,12 +142,23 @@ typedef struct _vkh_buffer_t*   VkhBuffer;
 typedef struct _vkh_queue_t*    VkhQueue;
 typedef struct _vkh_presenter_t* VkhPresenter;
 
+
+
+vkh_public
+void vkh_get_required_instance_extensions (const char** pExtensions, uint32_t* pExtCount);
+
+vkh_public
+bool vkh_get_required_device_extensions(VkPhysicalDevice phy, const char** pExtensions, uint32_t* pExtCount);
+
+vkh_public
+const void* vkh_get_device_requirements(VkPhysicalDevice phy, VkPhysicalDeviceFeatures* pEnabledFeatures);
+
 /*************
  * VkhApp    *
  *************/
 vkh_public
 VkhApp              vkh_app_create      (uint32_t version_major, uint32_t version_minor,
-                                                                                 const char* app_name, uint32_t enabledLayersCount, const char **enabledLayers, uint32_t ext_count, const char* extentions[]);
+                                                                                 const char* app_name, uint32_t enabledLayersCount, const char **enabledLayers, uint32_t ext_count, const char* extensions[]);
 vkh_public
 void                vkh_app_destroy     (VkhApp app);
 vkh_public

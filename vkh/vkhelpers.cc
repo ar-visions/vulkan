@@ -278,7 +278,7 @@ bool vkh_memory_type_from_properties(VkPhysicalDeviceMemoryProperties* memory_pr
 	}
 
 	// Search memtypes to find first index with those properties
-	for (uint32_t i = 0; i < memory_properties->memoryTypeCount; i++) {
+	for (uint32_t i = 0; i < memory_properties->memoryTypeCount; i++) { /// type count is 0. fix this.
 		if (CHECK_BIT(typeBits, i)) {
 			// Type is available, does it match user properties?
 			if ((memory_properties->memoryTypes[i].propertyFlags & memFlags) == memFlags) {

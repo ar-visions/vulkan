@@ -49,6 +49,7 @@ struct Vulkan:mx {
     struct impl {
         int v_major = 1;
         int v_minor = 0;
+        VkApplicationInfo app_info;
         void init();
         ~impl();
         VkInstance inst();

@@ -33,6 +33,7 @@ typedef struct _vkh_phy_t{
 	VkPhysicalDeviceMemoryProperties	memProps;
 	VkPhysicalDeviceProperties			properties;
 	VkQueueFamilyProperties*			queues;
+	VkPhysicalDeviceFeatures			supportedFeatures;
 	uint32_t							queueCount;
 	int									cQueue;//compute
 	int									gQueue;//graphic

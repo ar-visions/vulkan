@@ -34,7 +34,7 @@ void _set_size_and_bind(VkhDevice pDev, VkBufferUsageFlags usage, VkhMemoryUsage
 	buff->alignment = memReq.alignment;
 	buff->size = memAllocInfo.allocationSize;
 	buff->usageFlags = usage;
-	buff->memprops = memoryUsage;
+	buff->memprops = memoryUsage; /// needs VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
 
 	VK_CHECK_RESULT(vkBindBufferMemory(buff->pDev->dev, buff->buffer, buff->memory, 0));
 }

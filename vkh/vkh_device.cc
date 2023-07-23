@@ -32,6 +32,83 @@ static PFN_vkCmdBeginDebugUtilsLabelEXT		CmdBeginDebugUtilsLabelEXT;
 static PFN_vkCmdEndDebugUtilsLabelEXT		CmdEndDebugUtilsLabelEXT;
 static PFN_vkCmdInsertDebugUtilsLabelEXT	CmdInsertDebugUtilsLabelEXT;
 
+
+#define _CHECK_INST_EXT(ext)\
+if (vkh_instance_extension_supported(#ext)) {	\
+	if (pExtensions)							\
+	   pExtensions[*pExtCount] = #ext;			\
+	(*pExtCount)++;								\
+}
+void vkh_get_required_instance_extensions (const char** pExtensions, uint32_t* pExtCount) {
+	*pExtCount = 0;
+
+	vkh_instance_extensions_check_init ();
+
+#if defined(DEBUG) && defined (VKVG_DBG_UTILS)
+	_CHECK_INST_EXT(VK_EXT_debug_utils)
+#endif
+	_CHECK_INST_EXT(VK_KHR_get_physical_device_properties2)
+
+	vkh_instance_extensions_check_release();
+}
+
+bool _get_dev_extension_is_supported (VkExtensionProperties* pExtensionProperties, uint32_t extensionCount, const char* name) {
+	for (uint32_t i=0; i<extensionCount; i++) {
+		if (strcmp(name, pExtensionProperties[i].extensionName)==0)
+			return true;
+	}
+	return false;
+}
+#define _CHECK_DEV_EXT(ext) {					\
+	if (_get_dev_extension_is_supported(pExtensionProperties, extensionCount, #ext)){\
+		if (pExtensions)							\
+			pExtensions[*pExtCount] = #ext;			\
+		(*pExtCount)++;								\
+	}\
+}
+
+bool vkh_get_required_device_extensions (VkPhysicalDevice phy, const char** pExtensions, uint32_t* pExtCount) {
+	VkExtensionProperties* pExtensionProperties;
+	uint32_t extensionCount;
+
+	*pExtCount = 0;
+
+	VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(phy, NULL, &extensionCount, NULL));
+	pExtensionProperties = (VkExtensionProperties*)malloc(extensionCount * sizeof(VkExtensionProperties));
+	VK_CHECK_RESULT(vkEnumerateDeviceExtensionProperties(phy, NULL, &extensionCount, pExtensionProperties));
+
+	//https://vulkan.lunarg.com/doc/view/1.2.162.0/mac/1.2-extensions/vkspec.html#VK_KHR_portability_subset
+	_CHECK_DEV_EXT(VK_KHR_portability_subset);
+	VkPhysicalDeviceFeatures2 phyFeat2 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+
+	vkGetPhysicalDeviceFeatures2(phy, &phyFeat2);
+	return true;
+}
+
+//enabledFeature12 is guaranteed to be the first in pNext chain
+const void* vkh_get_device_requirements (VkPhysicalDevice phy, VkPhysicalDeviceFeatures* pEnabledFeatures) {
+
+	VkPhysicalDeviceFeatures supported;
+	vkGetPhysicalDeviceFeatures(phy, &supported);
+
+	pEnabledFeatures->fillModeNonSolid	= supported.fillModeNonSolid;  // VK_TRUE;
+	pEnabledFeatures->sampleRateShading	= supported.sampleRateShading; // VK_TRUE;
+	pEnabledFeatures->logicOp			= supported.logicOp; 		   // VK_TRUE;
+
+	void* pNext = NULL;
+
+#ifdef VK_VERSION_1_2
+	static VkPhysicalDeviceVulkan12Features enabledFeatures12 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+	};
+	enabledFeatures12.pNext = pNext;
+	pNext = &enabledFeatures12;
+#endif
+
+	return pNext;
+}
+
+
 VkhDevice vkh_device_create (VkhApp app, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info){
 	VkDevice dev;
 	VK_CHECK_RESULT(vkCreateDevice (phyInfo->phy, pDevice_info, NULL, &dev));

@@ -27,6 +27,7 @@ extern "C" {
 #endif
 
 #include <vkh/vkh.h>
+#include <vkh/vkh_phyinfo.h>
 
 #ifdef VKH_USE_VMA
 #include "vk_mem_alloc.h"
@@ -34,9 +35,10 @@ extern "C" {
 
 typedef struct _vkh_device_t{
 	VkDevice				dev;
-	VkPhysicalDeviceMemoryProperties phyMemProps;
-	VkPhysicalDevice		phy;
-	VkInstance				instance;
+	VkhPhyInfo			    phyinfo;			  /// create this from existing VkPhysicalDevice in cases where its not set.
+	VkPhysicalDeviceMemoryProperties phyMemProps; /// deprecate
+	VkPhysicalDevice		phy; 				  /// deprecate
+	VkInstance				instance; 			  /// deprecate
 #ifdef VKH_USE_VMA
 	VmaAllocator			allocator;
 #endif
