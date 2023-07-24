@@ -22,10 +22,6 @@
 #ifndef VKH_IMAGE_H
 #define VKH_IMAGE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <vkh/vkh.h>
 //#include "vk_mem_alloc.h"
 #include <async/tinycthread.h>
@@ -49,7 +45,4 @@ typedef struct _vkh_image_t {
 	mtx_t					mutex;
 }vkh_image_t;
 
-#ifdef __cplusplus
-}
-#endif
 #endif

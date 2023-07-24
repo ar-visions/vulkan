@@ -62,7 +62,7 @@ VkhImage _vkh_image_create (VkhDevice pDev, VkImageType imageType,
 	vkGetImageMemoryRequirements(pDev->dev, img->image, &memReq);
 	VkMemoryAllocateInfo memAllocInfo = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 										  .allocationSize = memReq.size };
-	vkh_memory_type_from_properties(&pDev->phyMemProps, memReq.memoryTypeBits, memprops,&memAllocInfo.memoryTypeIndex);
+	vkh_memory_type_from_properties(&pDev->e->memory_properties, memReq.memoryTypeBits, memprops,&memAllocInfo.memoryTypeIndex);
 	VK_CHECK_RESULT(vkAllocateMemory(pDev->dev, &memAllocInfo, NULL, &img->memory));
 	VK_CHECK_RESULT(vkBindImageMemory(pDev->dev, img->image, img->memory, 0));
 #endif

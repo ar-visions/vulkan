@@ -302,11 +302,34 @@ void GPU::impl::framebuffer_resized(GLFWwindow* window, int width, int height) {
 GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     GPU g = GPU();
 
+    /// this is from vk engine
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_RESIZABLE,  GLFW_TRUE);
+	glfwWindowHint(GLFW_FLOATING,   GLFW_FALSE);
+	glfwWindowHint(GLFW_DECORATED,  GLFW_TRUE);
+
+	/// control over the dpi selection can be looked up by the user, or forced off at an app scale
+	/// we can offer that form of index of monitors in another api
+    /// its important to get dpi under control from the start
+    /// ok, so backbuffer cases will usually render to the on-screen buffer. that means they must also be high dpi. this is obvious
+    /// dont leave it to the user to check this, again, and again, and again. a graphics api should facilitate graphics optimally
+	int mcount;
+    static int dpi_index = 0;
+	GLFWmonitor** monitors = glfwGetMonitors(&mcount);
+	if (mcount > dpi_index) {
+		glfwGetMonitorContentScale(monitors[dpi_index], &g->dpi_scale.x, &g->dpi_scale.y);
+	} else {
+		g->dpi_scale.x = 1.0f;
+		g->dpi_scale.y = 1.0f;
+	}
+
     g->window = initWindow(sz);
     g->sz = sz;
     
     Vulkan vk { 1, 2 }; /// singleton; if constructed prior with a version, that remains set
     vk->init();
+
+    g->instance = vk->inst();
 
     if (glfwCreateWindowSurface(instance, g->window, nullptr, &g->surface) != VK_SUCCESS) {
         throw std::runtime_error("failed to create window surface!");

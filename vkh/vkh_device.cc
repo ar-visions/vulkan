@@ -21,7 +21,7 @@
  */
 #include <vkh/vkh_device.h>
 #include <vkh/vkh_phyinfo.h>
-#include <vkh/vkh_app.h>
+#include <vkh/vkh.h>
 #include "string.h"
 
 
@@ -112,18 +112,17 @@ const void* vkh_get_device_requirements (VkPhysicalDevice phy, VkPhysicalDeviceF
 VkhDevice vkh_device_create (VkEngine e, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info){
 	VkDevice dev;
 	VK_CHECK_RESULT(vkCreateDevice (phyInfo->phy, pDevice_info, NULL, &dev));
-	VkhDevice vkhd = vkh_device_import(e->inst, phyInfo->phy, dev);
+	VkhDevice vkhd = vkh_device_import(e, phyInfo->phy, dev);
 	vkhd->e = e;
 	vkhd->phyinfo = vkh_phyinfo_grab(phyInfo);
 	return vkhd;
 }
-VkhDevice vkh_device_import (VkInstance inst, VkPhysicalDevice phy, VkDevice vkDev) {
+VkhDevice vkh_device_import (VkEngine e, VkPhysicalDevice phy, VkDevice vkDev) {
 	VkhDevice dev = (vkh_device_t*)calloc(1,sizeof(vkh_device_t));
 	dev->dev = vkDev;
-	dev->phy = phy;
-	dev->instance = inst;
+	dev->e = e;
 
-	vkGetPhysicalDeviceMemoryProperties (phy, &dev->phyMemProps);
+	vkGetPhysicalDeviceMemoryProperties (phy, &dev->e->memory_properties);
 #ifdef VKH_USE_VMA
 	VmaAllocatorCreateInfo allocatorInfo = {
 		.physicalDevice = phy,
@@ -135,12 +134,15 @@ VkhDevice vkh_device_import (VkInstance inst, VkPhysicalDevice phy, VkDevice vkD
 
 	return dev;
 }
+
 VkDevice vkh_device_get_vkdev (VkhDevice dev) {
-	return dev->dev;
+	return dev->e->vk_device->device;
 }
+
 VkPhysicalDevice vkh_device_get_phy (VkhDevice dev) {
-	return dev->phy;
+	return dev->e->vk_gpu->phys;
 }
+
 VkEngine vkh_device_get_engine (VkhDevice dev) {
 	return dev->e;
 }
@@ -149,12 +151,12 @@ VkEngine vkh_device_get_engine (VkhDevice dev) {
  * @param vkh device
  */
 void vkh_device_init_debug_utils (VkhDevice dev) {
-	SetDebugUtilsObjectNameEXT		= (PFN_vkSetDebugUtilsObjectNameEXT)	vkGetInstanceProcAddr(dev->instance, "vkSetDebugUtilsObjectNameEXT");
-	QueueBeginDebugUtilsLabelEXT	= (PFN_vkQueueBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->instance, "vkQueueBeginDebugUtilsLabelEXT");
-	QueueEndDebugUtilsLabelEXT		= (PFN_vkQueueEndDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->instance, "vkQueueEndDebugUtilsLabelEXT");
-	CmdBeginDebugUtilsLabelEXT		= (PFN_vkCmdBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->instance, "vkCmdBeginDebugUtilsLabelEXT");
-	CmdEndDebugUtilsLabelEXT		= (PFN_vkCmdEndDebugUtilsLabelEXT)		vkGetInstanceProcAddr(dev->instance, "vkCmdEndDebugUtilsLabelEXT");
-	CmdInsertDebugUtilsLabelEXT		= (PFN_vkCmdInsertDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->instance, "vkCmdInsertDebugUtilsLabelEXT");
+	SetDebugUtilsObjectNameEXT		= (PFN_vkSetDebugUtilsObjectNameEXT)	vkGetInstanceProcAddr(dev->e->inst, "vkSetDebugUtilsObjectNameEXT");
+	QueueBeginDebugUtilsLabelEXT	= (PFN_vkQueueBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->e->inst, "vkQueueBeginDebugUtilsLabelEXT");
+	QueueEndDebugUtilsLabelEXT		= (PFN_vkQueueEndDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->e->inst, "vkQueueEndDebugUtilsLabelEXT");
+	CmdBeginDebugUtilsLabelEXT		= (PFN_vkCmdBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->e->inst, "vkCmdBeginDebugUtilsLabelEXT");
+	CmdEndDebugUtilsLabelEXT		= (PFN_vkCmdEndDebugUtilsLabelEXT)		vkGetInstanceProcAddr(dev->e->inst, "vkCmdEndDebugUtilsLabelEXT");
+	CmdInsertDebugUtilsLabelEXT		= (PFN_vkCmdInsertDebugUtilsLabelEXT)	vkGetInstanceProcAddr(dev->e->inst, "vkCmdInsertDebugUtilsLabelEXT");
 }
 VkSampler vkh_device_create_sampler (VkhDevice dev, VkFilter magFilter, VkFilter minFilter,
 							   VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode){

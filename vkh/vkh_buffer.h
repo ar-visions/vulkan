@@ -22,9 +22,6 @@
 #ifndef VKH_BUFFER_H
 #define VKH_BUFFER_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #include <vkh/vkh.h>
 
@@ -50,7 +47,5 @@ typedef struct _vkh_buffer_t {
 	VkDeviceSize			alignment;
 	void*					mapped;
 }vkh_buffer_t;
-#ifdef __cplusplus
-}
-#endif
+
 #endif

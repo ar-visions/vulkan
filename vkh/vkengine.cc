@@ -20,6 +20,7 @@
  * THE SOFTWARE.
  */
 
+#include <vk/vk.hpp>
 #include "vkh/vkh.h"
 #include "vkh/vkengine.h"
 #include "vkh/vkh_phyinfo.h"
@@ -91,39 +92,6 @@ void vkengine_free_phyinfos (uint32_t count, VkhPhyInfo* infos) {
 	for (uint32_t i=0; i<count; i++)
 		vkh_phyinfo_drop (infos[i]);
 	free (infos);
-}
-/**
- * @brief Add a Debug utils messenger to this  VkEngine. It will be destroyed on VkEngine end.
- * @param VKH application pointer containing vkInstance.
- * @param Message type flags
- * @param Message severity flags.
- * @param optional message callback, if null a default one which print to stdout is configured.
- */
-void vkengine_enable_debug_messenger (VkEngine e,
-	VkDebugUtilsMessageTypeFlagsEXT typeFlags,
-	VkDebugUtilsMessageSeverityFlagsEXT severityFlags,
-	PFN_vkDebugUtilsMessengerCallbackEXT callback){
-
-	VkDebugUtilsMessengerCreateInfoEXT info = { .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-												.pNext = VK_NULL_HANDLE,
-												.flags = 0,
-												.messageSeverity = severityFlags,
-												.messageType = typeFlags,
-												.pUserData = NULL };
-	if (callback == NULL)
-		info.pfnUserCallback = (PFN_vkDebugUtilsMessengerCallbackEXT)debugUtilsMessengerCallback;
-	else
-		info.pfnUserCallback = callback;
-
-	PFN_vkCreateDebugUtilsMessengerEXT	CreateDebugUtilsMessenger = (PFN_vkCreateDebugUtilsMessengerEXT)
-			vkGetInstanceProcAddr(e->inst, "vkCreateDebugUtilsMessengerEXT");
-
-	CreateDebugUtilsMessenger(e->inst, &info, VK_NULL_HANDLE, &e->debugMessenger);
-}
-
-#define TRY_LOAD_DEVICE_EXT(ext) {								\
-if (vkh_phyinfo_try_get_extension_properties(pi, #ext, NULL))	\
-	enabledExts[enabledExtsCount++] = #ext;						\
 }
 
 static void glfw_error_callback(int error, const char *description) {
@@ -225,109 +193,43 @@ VkEngine vkengine_create (
 	}
 
 	uint32_t phyCount = 0;
-	uint32_t glfwReqExtsCount = 0;
-	const char** gflwExts = glfwGetRequiredInstanceExtensions (&glfwReqExtsCount);
 
-	vkh_get_required_instance_extensions (enabledExts, &enabledExtsCount);
-
-	for (uint32_t i=0;i<glfwReqExtsCount;i++)
-		enabledExts[i+enabledExtsCount] = gflwExts[i];
-
-	enabledExtsCount += glfwReqExtsCount;
-
-	int count;
-	GLFWmonitor** monitors = glfwGetMonitors(&count);
-
-	e = (VkEngine)calloc(1, sizeof(vk_engine_t));
-	e->refs = 1;
-	/// control over the dpi selection is looked up by the user
-	/// we can offer that form of index of monitors in another api
-	if (count > dpi_index) {
-		glfwGetMonitorContentScale(monitors[dpi_index], &e->dpi_scale_x, &e->dpi_scale_y);
-	} else {
-		e->dpi_scale_x = 1.0f;
-		e->dpi_scale_y = 1.0f;
-	}
-
-	/// instance vk with ion (we will bring this api into that abstract next phase)
-    ion::Vulkan vk { version_major, version_minor }; /// singleton; if constructed prior with a version, that remains set
-    vk->init();
-
-	e->infos = vk->app_info;
-	e->debugMessenger = VK_NULL_HANDLE;
-	e->inst = vk->inst();
-
-#if defined(DEBUG) && defined (VKVG_DBG_UTILS)
-	vkengine_enable_debug_messenger(e
-							   , VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
-							   //| VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
-							   //| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
-							   , VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT
-							   | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
-							   //| VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
-							   //| VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
-							   , NULL);
-#endif
-
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	glfwWindowHint(GLFW_RESIZABLE,  GLFW_TRUE);
-	glfwWindowHint(GLFW_FLOATING,   GLFW_FALSE);
-	glfwWindowHint(GLFW_DECORATED,  GLFW_TRUE);
-
-	e->window = glfwCreateWindow ((int)width, (int)height, "Window Title", NULL, NULL);
-	glfwShowWindow(e->window);
-
-	VkSurfaceKHR surf;
-	VK_CHECK_RESULT (glfwCreateWindowSurface(e->inst, e->window, NULL, &surf))
-
-	VkhPhyInfo* phys = vkengine_get_phyinfos (e, &phyCount, surf);
-
-	VkhPhyInfo pi = 0;
-	if (!vkengine_try_get_phyinfo(phys, phyCount, preferedGPU, &pi)
-	&&  !vkengine_try_get_phyinfo(phys, phyCount, VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU, &pi)
-	&&  !vkengine_try_get_phyinfo(phys, phyCount, VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU, &pi))
-		pi = phys[0];
-	assert(pi && "No vulkan physical device found.");
-
-	e->memory_properties = pi->memProps;
-	e->gpu_props = pi->properties;
+	VkEngine e   = (VkEngine)calloc(1, sizeof(vk_engine_t));
+	e->vk_gpu    = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)e);
+	e->vk_device = ion::Device::create(e->vk_gpu);
+	e->refs      = 1;
+	e->inst      = e->vk_gpu->instance;
+	e->window 	 = e->vk_gpu->window;
+	e->pi 	     = vkh_phyinfo_create(e->vk_gpu->phys, e->vk_gpu->surface);
+	e->memory_properties = e->pi->memProps;
+	e->gpu_props = e->pi->properties;
 
 	uint32_t qCount = 0;
 	float qPriorities[] = {0.0};
 
-	VkDeviceQueueCreateInfo pQueueInfos[] = { {0},{0},{0} };
-	if (vkh_phyinfo_create_presentable_queues	(pi, 1, qPriorities, &pQueueInfos[qCount]))
+	VkDeviceQueueCreateInfo pQueueInfos[] = { };
+	if (vkh_phyinfo_create_presentable_queues	(e->pi, 1, qPriorities, &pQueueInfos[qCount]))
 		qCount++;
-	/*if (vkh_phyinfo_create_compute_queues		(pi, 1, qPriorities, &pQueueInfos[qCount]))
+	/*if (vkh_phyinfo_create_compute_queues		(e->pi, 1, qPriorities, &pQueueInfos[qCount]))
 		qCount++;
-	if (vkh_phyinfo_create_transfer_queues		(pi, 1, qPriorities, &pQueueInfos[qCount]))
+	if (vkh_phyinfo_create_transfer_queues		(e->pi, 1, qPriorities, &pQueueInfos[qCount]))
 		qCount++;*/
 
-	enabledExtsCount=0;
 
-	if (!vkh_get_required_device_extensions (pi->phy, enabledExts, &enabledExtsCount)) {
-		perror ("vkh_get_required_device_extensions failed, enable log for details.\n");
-		exit(-1);
-	}
-	TRY_LOAD_DEVICE_EXT (VK_KHR_swapchain)
+	/// copy from vk
+	e->pi->supportedFeatures = e->vk_gpu->support;
 
-	const void* pNext = vkh_get_device_requirements (pi->phy, &pi->supportedFeatures);
+	/// this was vkh_device_create; importing from vk now; the extensions should match
+	e->dev = vkh_device_import (e, e->vk_gpu->phys, e->vk_device->device);
 
-	VkDeviceCreateInfo device_info = {
-		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-		.queueCreateInfoCount = qCount,
-		.pQueueCreateInfos = (VkDeviceQueueCreateInfo*)&pQueueInfos,
-		.enabledExtensionCount = enabledExtsCount,
-		.ppEnabledExtensionNames = enabledExts,
-		.pEnabledFeatures = &pi->supportedFeatures,
-		.pNext = pNext};
+	/// create presenter associated to engine/window
+	e->renderer = vkh_presenter_create(
+		e->dev,
+		(uint32_t) e->pi->pQueue, e->vk_gpu->surface,
+		width    * e->vk_gpu->dpi_scale.x,
+		height   * e->vk_gpu->dpi_scale.y,
+		VK_FORMAT_B8G8R8A8_UNORM, presentMode);
 
-	e->dev = vkh_device_create(e, pi, &device_info);
-
-	e->renderer = vkh_presenter_create
-			(e->dev, (uint32_t) pi->pQueue, surf, width * 2, height * 2, VK_FORMAT_B8G8R8A8_UNORM, presentMode);
-
-	vkengine_free_phyinfos (phyCount, phys);
 	singleton = e;
 	return e;
 }
@@ -343,17 +245,9 @@ void vkengine_drop (VkEngine e) {
 		//vkDeviceWaitIdle(e->dev->dev);
 		VkSurfaceKHR surf = e->renderer->surface;
 		vkh_presenter_destroy(e->renderer);
-		vkDestroySurfaceKHR(e->inst, surf, NULL);
 		vkh_device_destroy(e->dev);
-		glfwDestroyWindow(e->window);
-		glfwTerminate();
-		///
-		if (e->debugMessenger != VK_NULL_HANDLE) {
-			PFN_vkDestroyDebugUtilsMessengerEXT	 DestroyDebugUtilsMessenger = (PFN_vkDestroyDebugUtilsMessengerEXT)
-					vkGetInstanceProcAddr(e->inst, "vkDestroyDebugUtilsMessengerEXT");
-			DestroyDebugUtilsMessenger (e->inst, e->debugMessenger, VK_NULL_HANDLE);
-		}
-		vkDestroyInstance (e->inst, NULL);
+		e->vk_device.drop();
+		e->vk_gpu.drop();
 		free(e);
 	}
 }
@@ -383,15 +277,15 @@ void vkengine_set_title(VkEngine e, const char* title) {
 }
 
 VkInstance vkengine_get_instance(VkEngine e) {
-	return e->dev->instance;
+	return e->vk_gpu->instance;
 }
 
 VkDevice vkengine_get_device(VkEngine e) {
-	return e->dev->dev;
+	return e->vk_device->device;
 }
 
 VkPhysicalDevice vkengine_get_physical_device(VkEngine e) {
-	return e->dev->phy;
+	return e->vk_gpu->phys;
 }
 
 VkQueue vkengine_get_queue(VkEngine e) {
@@ -403,7 +297,7 @@ uint32_t vkengine_get_queue_fam_idx(VkEngine e) {
 }
 
 void vkengine_wait_idle (VkEngine e) {
-	vkDeviceWaitIdle(e->dev->dev);
+	vkDeviceWaitIdle(e->vk_device->device);
 }
 
 void vkengine_set_key_callback (VkEngine e, GLFWkeyfun key_callback){

@@ -85,8 +85,9 @@ struct Device;
 
 struct GPU:mx {
     struct impl {
+        VkInstance              instance;
         VkPhysicalDevice        phys        = VK_NULL_HANDLE;
-        VkSampleCountFlagBits   msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+        VkSampleCountFlagBits   msaaSamples = VK_SAMPLE_COUNT_1_BIT; /// max allowed by this GPU, not the actual sample counts used all the time; it can also force sampling down
         GLFWwindow*             window      = NULL;
         VkSurfaceKHR            surface     = 0;
         QueueFamilyIndices      indices;
@@ -95,6 +96,7 @@ struct GPU:mx {
         ResizeFn                resize;
         vec2i                   sz;
         VkPhysicalDeviceFeatures support;
+        vec2f                   dpi_scale;
 
         VkSampleCountFlagBits getUsableSampling(VkSampleCountFlagBits max);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);

@@ -168,10 +168,10 @@ void vkh_presenter_get_size (VkhPresenter r, uint32_t* pWidth, uint32_t* pHeight
 }
 void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR presentMode){
 	uint32_t count;
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->dev->phy, r->surface, &count, NULL));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->dev->e->vk_gpu->phys, r->surface, &count, NULL));
 	assert (count>0);
 	VkSurfaceFormatKHR* formats = (VkSurfaceFormatKHR*)malloc(count * sizeof(VkSurfaceFormatKHR));
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->dev->phy, r->surface, &count, formats));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->dev->e->vk_gpu->phys, r->surface, &count, formats));
 
 	for (uint32_t i=0; i<count; i++){
 		if (formats[i].format == preferedFormat) {
@@ -182,10 +182,10 @@ void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR
 	}
 	assert (r->format != VK_FORMAT_UNDEFINED);
 
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->dev->phy, r->surface, &count, NULL));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->dev->e->vk_gpu->phys, r->surface, &count, NULL));
 	assert (count>0);
 	VkPresentModeKHR* presentModes = (VkPresentModeKHR*)malloc(count * sizeof(VkPresentModeKHR));
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->dev->phy, r->surface, &count, presentModes));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->dev->e->vk_gpu->phys, r->surface, &count, presentModes));
 	r->presentMode =(VkPresentModeKHR)-1;
 	for (uint32_t i=0; i<count; i++){
 		if (presentModes[i] == presentMode) {
@@ -205,7 +205,7 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 	vkDeviceWaitIdle(r->dev->dev);
 
 	VkSurfaceCapabilitiesKHR surfCapabilities;
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(r->dev->phy, r->surface, &surfCapabilities));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(r->dev->e->vk_gpu->phys, r->surface, &surfCapabilities));
 	assert (surfCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
 	// width and height are either both 0xFFFFFFFF, or both not 0xFFFFFFFF.

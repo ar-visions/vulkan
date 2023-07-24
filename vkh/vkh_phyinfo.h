@@ -22,10 +22,6 @@
 #ifndef VKH_PHY_H
 #define VKH_PHY_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <vkh/vkh.h>
 
 typedef struct _vkh_phy_t{
@@ -47,7 +43,5 @@ typedef struct _vkh_phy_t{
 	VkExtensionProperties*				pExtensionProperties;
 	uint32_t							extensionCount;
 }vkh_phy_t;
-#ifdef __cplusplus
-}
-#endif
+
 #endif

@@ -29,9 +29,10 @@
 
 #undef APIENTRY
 
-#include <vulkan/vulkan.h>
+#include <vk/vk.hpp>
+#include <vkh/vkh.h>
 
-#include "vkh.h"
+//using namespace ion; /// bad form but its important
 
 #define FENCE_TIMEOUT 100000000
 
@@ -58,16 +59,15 @@ struct GLFWwindow;
 /// merging app & engine makes sense.
 typedef struct _vk_engine_t {
 	int									refs;
-	VkApplicationInfo					infos;
+	ion::GPU							vk_gpu;
+	ion::Device							vk_device;
+	VkhPhyInfo							pi;
 	VkInstance							inst;
-	VkDebugUtilsMessengerEXT 			debugMessenger;
 	VkPhysicalDeviceMemoryProperties	memory_properties;
 	VkPhysicalDeviceProperties			gpu_props;
 	VkhDevice							dev;
 	struct GLFWwindow*					window;
 	VkhPresenter						renderer;
-	float								dpi_scale_x;
-	float								dpi_scale_y;
 	///
 } vk_engine_t;
 
@@ -81,10 +81,10 @@ vk_engine_t*   vkengine_create(
 	uint32_t version_major, uint32_t version_minor, const char* app_name,
 	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, uint32_t width, uint32_t height, int dpi_index);
 
-void vkengine_dump_available_layers   ();
-bool 				vkengine_try_get_phyinfo (VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy);
-void 				vkengine_drop			(VkEngine e);
-VkEngine 			vkengine_grab		(VkEngine e);
+void 				vkengine_dump_available_layers   	();
+bool 				vkengine_try_get_phyinfo 			(VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy);
+void 				vkengine_drop						(VkEngine e);
+VkEngine 			vkengine_grab						(VkEngine e);
 bool 				vkengine_should_close				(VkEngine e);
 void 				vkengine_close						(VkEngine e);
 void 				vkengine_dump_Infos					(VkEngine e);

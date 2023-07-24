@@ -20,8 +20,7 @@
  * THE SOFTWARE.
  */
 #include <vkh/vkh_phyinfo.h>
-#include <vkh/vkh_app.h>
-
+#include <vkh/vkh.h>
 
 VkhPhyInfo vkh_phyinfo_grab(VkhPhyInfo pi) {
 	if (pi)

@@ -22,10 +22,6 @@
 #ifndef VK_HELPERS_H
 #define VK_HELPERS_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <vulkan/vulkan.h>
@@ -105,7 +101,7 @@ typedef enum VkhMemoryUsage
 #include <string.h>
 
 #define _USE_MATH_DEFINES   //to have M_PI* defined with MSVC
-#include <math.h>
+#include <cmath>
 
 #define VKH_KO      0x00000400
 #define VKH_MO      0x00100000
@@ -208,7 +204,7 @@ bool vkh_phyinfo_try_get_extension_properties (VkhPhyInfo phy, const char* name,
  * VkhDevice *
  *************/
 vkh_public VkhDevice           vkh_device_create           (VkEngine e, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info);
-vkh_public VkhDevice           vkh_device_import           (VkInstance inst, VkPhysicalDevice phy, VkDevice vkDev);
+vkh_public VkhDevice           vkh_device_import           (VkEngine e, VkPhysicalDevice phy, VkDevice vkDev);
 vkh_public void                vkh_device_destroy          (VkhDevice dev);
 vkh_public
 void                vkh_device_init_debug_utils (VkhDevice dev);
@@ -412,8 +408,5 @@ vkh_public
 void vkh_layers_check_init ();
 vkh_public
 void vkh_layers_check_release ();
-#ifdef __cplusplus
-}
-#endif
 
 #endif

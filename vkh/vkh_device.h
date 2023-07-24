@@ -22,10 +22,6 @@
 #ifndef VKH_DEVICE_H
 #define VKH_DEVICE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <vkh/vkh.h>
 #include <vkh/vkh_phyinfo.h>
 
@@ -46,7 +42,4 @@ typedef struct _vkh_device_t{
 
 } vkh_device_t;
 
-#ifdef __cplusplus
-}
-#endif
 #endif

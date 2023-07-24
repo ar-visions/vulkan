@@ -22,10 +22,6 @@
 #ifndef VKH_QUEUE_H
 #define VKH_QUEUE_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <vkh/vkh.h>
 
 typedef struct _vkh_queue_t{
@@ -35,7 +31,4 @@ typedef struct _vkh_queue_t{
 	VkQueueFlags	flags;
 }vkh_queue_t;
 
-#ifdef __cplusplus
-}
-#endif
 #endif
