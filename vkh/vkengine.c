@@ -22,13 +22,104 @@
 
 #include "vkh/vkh.h"
 #include "vkh/vkengine.h"
-#include "vkh/vkh_app.h"
 #include "vkh/vkh_phyinfo.h"
 #include "vkh/vkh_presenter.h"
 #include "vkh/vkh_image.h"
 #include "vkh/vkh_device.h"
 
+/// will merge vkengine & vk next
+#include <GLFW/glfw3.h>
+
 //#include "vkg/vkvg.h"
+
+VkBool32 debugUtilsMessengerCallback (
+	VkDebugUtilsMessageSeverityFlagBitsEXT			 messageSeverity,
+	VkDebugUtilsMessageTypeFlagsEXT					 messageTypes,
+	const VkDebugUtilsMessengerCallbackDataEXT*		 pCallbackData,
+	void*											 pUserData) {
+
+	switch (messageSeverity) {
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+		printf (KYEL);
+		break;
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+		printf (KRED);
+		break;
+	default:
+	case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+		printf (KGRN);
+		break;
+	}
+	switch (messageTypes) {
+	case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
+		printf ("GEN: ");
+		break;
+	case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
+		printf ("VAL: ");
+		break;
+	case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:
+		printf ("PRF: ");
+		break;
+	}
+
+	printf (KNRM);
+	printf ("%s\n", pCallbackData->pMessage);
+
+
+	fflush(stdout);
+	return VK_FALSE;
+}
+
+VkInstance vkengine_get_inst (VkEngine e) {
+	return e->inst;
+}
+
+VkhPhyInfo* vkengine_get_phyinfos (VkEngine e, uint32_t* count, VkSurfaceKHR surface) {
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->inst, count, NULL));
+	VkPhysicalDevice* phyDevices = (VkPhysicalDevice*)malloc((*count) * sizeof(VkPhysicalDevice));
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->inst, count, phyDevices));
+	VkhPhyInfo* infos = (VkhPhyInfo*)malloc((*count) * sizeof(VkhPhyInfo));
+
+	for (uint32_t i=0; i<(*count); i++)
+		infos[i] = vkh_phyinfo_create (phyDevices[i], surface);
+
+	free (phyDevices);
+	return infos;
+}
+
+void vkengine_free_phyinfos (uint32_t count, VkhPhyInfo* infos) {
+	for (uint32_t i=0; i<count; i++)
+		vkh_phyinfo_drop (infos[i]);
+	free (infos);
+}
+/**
+ * @brief Add a Debug utils messenger to this  VkEngine. It will be destroyed on VkEngine end.
+ * @param VKH application pointer containing vkInstance.
+ * @param Message type flags
+ * @param Message severity flags.
+ * @param optional message callback, if null a default one which print to stdout is configured.
+ */
+void vkengine_enable_debug_messenger (VkEngine e,
+	VkDebugUtilsMessageTypeFlagsEXT typeFlags,
+	VkDebugUtilsMessageSeverityFlagsEXT severityFlags,
+	PFN_vkDebugUtilsMessengerCallbackEXT callback){
+
+	VkDebugUtilsMessengerCreateInfoEXT info = { .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+												.pNext = VK_NULL_HANDLE,
+												.flags = 0,
+												.messageSeverity = severityFlags,
+												.messageType = typeFlags,
+												.pUserData = NULL };
+	if (callback == NULL)
+		info.pfnUserCallback = (PFN_vkDebugUtilsMessengerCallbackEXT)debugUtilsMessengerCallback;
+	else
+		info.pfnUserCallback = callback;
+
+	PFN_vkCreateDebugUtilsMessengerEXT	CreateDebugUtilsMessenger = (PFN_vkCreateDebugUtilsMessengerEXT)
+			vkGetInstanceProcAddr(e->inst, "vkCreateDebugUtilsMessengerEXT");
+
+	CreateDebugUtilsMessenger(e->inst, &info, VK_NULL_HANDLE, &e->debugMessenger);
+}
 
 #define TRY_LOAD_DEVICE_EXT(ext) {								\
 if (vkh_phyinfo_try_get_extension_properties(pi, #ext, NULL))	\
@@ -78,8 +169,6 @@ void vkengine_dump_Infos (VkEngine e){
 	}
 }
 
-
-
 void vkengine_dump_available_layers () {
 	uint32_t layerCount;
 	vkEnumerateInstanceLayerProperties(&layerCount, NULL);
@@ -95,6 +184,7 @@ void vkengine_dump_available_layers () {
 	printf("-----------------\n\n");
 	free (availableLayers);
 }
+
 bool vkengine_try_get_phyinfo (VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy) {
 	for (uint32_t i=0; i<phyCount; i++){
 		if (phys[i]->properties.deviceType == gpuType) {
@@ -104,6 +194,7 @@ bool vkengine_try_get_phyinfo (VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDe
 	}
 	return false;
 }
+
 bool instance_extension_supported (VkExtensionProperties* instanceExtProps, uint32_t extCount, const char* instanceName) {
 	for (uint32_t i=0; i<extCount; i++) {
 		if (!strcmp(instanceExtProps[i].extensionName, instanceName))
@@ -112,7 +203,15 @@ bool instance_extension_supported (VkExtensionProperties* instanceExtProps, uint
 	return false;
 }
 
-vk_engine_t* vkengine_create (VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, uint32_t width, uint32_t height) {
+static VkEngine singleton;
+
+VkEngine vkengine_create (
+	uint32_t version_major, uint32_t version_minor, const char* app_name,
+	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, uint32_t width, uint32_t height, int dpi_index)
+{
+	if (singleton)
+		return singleton;
+	
 	glfwSetErrorCallback(glfw_error_callback);
 
 	if (!glfwInit()) {
@@ -125,26 +224,7 @@ vk_engine_t* vkengine_create (VkPhysicalDeviceType preferedGPU, VkPresentModeKHR
 		exit(-1);
 	}
 
-	const char* enabledLayers[10];
-	const char* enabledExts [10];
-	uint32_t enabledExtsCount = 0, enabledLayersCount = 0, phyCount = 0;
-
-	vkh_layers_check_init();
-#ifdef VKVG_USE_VALIDATION
-	if (vkh_layer_is_present("VK_LAYER_KHRONOS_validation"))
-		enabledLayers[enabledLayersCount++] = "VK_LAYER_KHRONOS_validation";
-#endif
-#ifdef VKVG_USE_MESA_OVERLAY
-	if (vkh_layer_is_present("VK_LAYER_MESA_overlay"))
-		enabledLayers[enabledLayersCount++] = "VK_LAYER_MESA_overlay";
-#endif
-
-#ifdef VKVG_USE_RENDERDOC
-	if (vkh_layer_is_present("VK_LAYER_RENDERDOC_Capture"))
-		enabledLayers[enabledLayersCount++] = "VK_LAYER_RENDERDOC_Capture";
-#endif
-	vkh_layers_check_release();
-
+	uint32_t phyCount = 0;
 	uint32_t glfwReqExtsCount = 0;
 	const char** gflwExts = glfwGetRequiredInstanceExtensions (&glfwReqExtsCount);
 
@@ -155,17 +235,30 @@ vk_engine_t* vkengine_create (VkPhysicalDeviceType preferedGPU, VkPresentModeKHR
 
 	enabledExtsCount += glfwReqExtsCount;
 
-	vk_engine_t* e = (vk_engine_t*)calloc(1,sizeof(vk_engine_t));
+	int count;
+	GLFWmonitor** monitors = glfwGetMonitors(&count);
 
-#ifdef VK_VERSION_1_2
-	e->app =  vkh_app_create(1, 2, "vkvg", enabledLayersCount, enabledLayers, enabledExtsCount, enabledExts);
-#else
-	e->app =  vkh_app_create(1, 1, "vkvg", enabledLayersCount, enabledLayers, enabledExtsCount, enabledExts);
-#endif
+	e = (VkEngine)calloc(1, sizeof(vk_engine_t));
+	e->refs = 1;
+	/// control over the dpi selection is looked up by the user
+	/// we can offer that form of index of monitors in another api
+	if (count > dpi_index) {
+		glfwGetMonitorContentScale(monitors[dpi_index], &e->dpi_scale_x, &e->dpi_scale_y);
+	} else {
+		e->dpi_scale_x = 1.0f;
+		e->dpi_scale_y = 1.0f;
+	}
 
+	/// instance vk with ion (we will bring this api into that abstract next phase)
+    ion::Vulkan vk { version_major, version_minor }; /// singleton; if constructed prior with a version, that remains set
+    vk->init();
+
+	e->infos = vk->app_info;
+	e->debugMessenger = VK_NULL_HANDLE;
+	e->inst = vk->inst();
 
 #if defined(DEBUG) && defined (VKVG_DBG_UTILS)
-	vkh_app_enable_debug_messenger(e->app
+	vkengine_enable_debug_messenger(e
 							   , VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
 							   //| VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
 							   //| VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT
@@ -183,11 +276,11 @@ vk_engine_t* vkengine_create (VkPhysicalDeviceType preferedGPU, VkPresentModeKHR
 
 	e->window = glfwCreateWindow ((int)width, (int)height, "Window Title", NULL, NULL);
 	glfwShowWindow(e->window);
-	
-	VkSurfaceKHR surf;
-	VK_CHECK_RESULT (glfwCreateWindowSurface(e->app->inst, e->window, NULL, &surf))
 
-	VkhPhyInfo* phys = vkh_app_get_phyinfos (e->app, &phyCount, surf);
+	VkSurfaceKHR surf;
+	VK_CHECK_RESULT (glfwCreateWindowSurface(e->inst, e->window, NULL, &surf))
+
+	VkhPhyInfo* phys = vkengine_get_phyinfos (e, &phyCount, surf);
 
 	VkhPhyInfo pi = 0;
 	if (!vkengine_try_get_phyinfo(phys, phyCount, preferedGPU, &pi)
@@ -229,36 +322,47 @@ vk_engine_t* vkengine_create (VkPhysicalDeviceType preferedGPU, VkPresentModeKHR
 		.pEnabledFeatures = &pi->supportedFeatures,
 		.pNext = pNext};
 
-	e->dev = vkh_device_create(e->app, pi, &device_info);
+	e->dev = vkh_device_create(e, pi, &device_info);
 
 	e->renderer = vkh_presenter_create
-			(e->dev, (uint32_t) pi->pQueue, surf, width, height, VK_FORMAT_B8G8R8A8_UNORM, presentMode);
+			(e->dev, (uint32_t) pi->pQueue, surf, width * 2, height * 2, VK_FORMAT_B8G8R8A8_UNORM, presentMode);
 
-	vkh_app_free_phyinfos (phyCount, phys);
-
+	vkengine_free_phyinfos (phyCount, phys);
+	singleton = e;
 	return e;
 }
 
-void vkengine_destroy (VkEngine e) {
-	//vkDeviceWaitIdle(e->dev->dev);
-
-	VkSurfaceKHR surf = e->renderer->surface;
-
-	vkh_presenter_destroy (e->renderer);
-	vkDestroySurfaceKHR (e->app->inst, surf, NULL);
-
-	vkh_device_destroy (e->dev);
-
-	glfwDestroyWindow (e->window);
-	vkh_app_destroy (e->app);
-
-	glfwTerminate ();
-
-	free(e);
+VkEngine vkengine_grab (VkEngine e) {
+	if (e)
+		e->refs++;
+	return e;
 }
+
+void vkengine_drop (VkEngine e) {
+	if (e && --e->refs == 0) {
+		//vkDeviceWaitIdle(e->dev->dev);
+		VkSurfaceKHR surf = e->renderer->surface;
+		vkh_presenter_destroy(e->renderer);
+		vkDestroySurfaceKHR(e->inst, surf, NULL);
+		vkh_device_destroy(e->dev);
+		glfwDestroyWindow(e->window);
+		glfwTerminate();
+		///
+		if (e->debugMessenger != VK_NULL_HANDLE) {
+			PFN_vkDestroyDebugUtilsMessengerEXT	 DestroyDebugUtilsMessenger = (PFN_vkDestroyDebugUtilsMessengerEXT)
+					vkGetInstanceProcAddr(e->inst, "vkDestroyDebugUtilsMessengerEXT");
+			DestroyDebugUtilsMessenger (e->inst, e->debugMessenger, VK_NULL_HANDLE);
+		}
+		vkDestroyInstance (e->inst, NULL);
+		free(e);
+	}
+}
+
+/// i think vkengine should support multiple windows
 void vkengine_close (VkEngine e) {
 	glfwSetWindowShouldClose(e->window, GLFW_TRUE);
 }
+
 void vkengine_blitter_run (VkEngine e, VkImage img, uint32_t width, uint32_t height) {
 	VkhPresenter p = e->renderer;
 	vkh_presenter_build_blit_cmd (p, img, width, height);
@@ -269,27 +373,35 @@ void vkengine_blitter_run (VkEngine e, VkImage img, uint32_t width, uint32_t hei
 			vkh_presenter_build_blit_cmd (p, img, width, height);
 	}
 }
-bool vkengine_should_close (VkEngine e) {
+
+bool vkengine_should_close(VkEngine e) {
 	return glfwWindowShouldClose (e->window);
 }
-void vkengine_set_title (VkEngine e, const char* title) {
+
+void vkengine_set_title(VkEngine e, const char* title) {
 	glfwSetWindowTitle(e->window, title);
 }
-VkInstance vkengine_get_instance (VkEngine e){
+
+VkInstance vkengine_get_instance(VkEngine e) {
 	return e->dev->instance;
 }
-VkDevice vkengine_get_device (VkEngine e){
+
+VkDevice vkengine_get_device(VkEngine e) {
 	return e->dev->dev;
 }
-VkPhysicalDevice vkengine_get_physical_device (VkEngine e){
+
+VkPhysicalDevice vkengine_get_physical_device(VkEngine e) {
 	return e->dev->phy;
 }
-VkQueue vkengine_get_queue (VkEngine e){
+
+VkQueue vkengine_get_queue(VkEngine e) {
 	return e->renderer->queue;
 }
-uint32_t vkengine_get_queue_fam_idx (VkEngine e){
+
+uint32_t vkengine_get_queue_fam_idx(VkEngine e) {
 	return e->renderer->qFam;
 }
+
 void vkengine_wait_idle (VkEngine e) {
 	vkDeviceWaitIdle(e->dev->dev);
 }
@@ -297,15 +409,19 @@ void vkengine_wait_idle (VkEngine e) {
 void vkengine_set_key_callback (VkEngine e, GLFWkeyfun key_callback){
 	glfwSetKeyCallback (e->window, key_callback);
 }
+
 void vkengine_set_mouse_but_callback (VkEngine e, GLFWmousebuttonfun onMouseBut){
 	glfwSetMouseButtonCallback(e->window, onMouseBut);
 }
+
 void vkengine_set_cursor_pos_callback (VkEngine e, GLFWcursorposfun onMouseMove){
 	glfwSetCursorPosCallback(e->window, onMouseMove);
 }
+
 void vkengine_set_scroll_callback (VkEngine e, GLFWscrollfun onScroll){
 	glfwSetScrollCallback(e->window, onScroll);
 }
+
 void vkengine_set_char_callback (VkEngine e, GLFWcharfun onChar){
 	glfwSetCharCallback(e->window, onChar);
 }

@@ -134,7 +134,7 @@ typedef enum VkhMemoryUsage
     #endif
 #endif
 
-typedef struct _vkh_app_t*      VkhApp;
+typedef struct _vk_engine_t*    VkEngine;
 typedef struct _vkh_phy_t*      VkhPhyInfo;
 typedef struct _vkh_device_t*   VkhDevice;
 typedef struct _vkh_image_t*    VkhImage;
@@ -142,7 +142,7 @@ typedef struct _vkh_buffer_t*   VkhBuffer;
 typedef struct _vkh_queue_t*    VkhQueue;
 typedef struct _vkh_presenter_t* VkhPresenter;
 
-
+#include <vkh/vkengine.h>
 
 vkh_public
 void vkh_get_required_instance_extensions (const char** pExtensions, uint32_t* pExtCount);
@@ -153,36 +153,33 @@ bool vkh_get_required_device_extensions(VkPhysicalDevice phy, const char** pExte
 vkh_public
 const void* vkh_get_device_requirements(VkPhysicalDevice phy, VkPhysicalDeviceFeatures* pEnabledFeatures);
 
-/*************
- * VkhApp    *
- *************/
+//vkh_public VkEngine vkengine_create(uint32_t version_major, uint32_t version_minor, const char* app_name, uint32_t enabledLayersCount, const char *enabledLayers[], uint32_t ext_count, const char* extensions[]);
+
+vkh_public void vkengine_drop     (VkEngine e);
+vkh_public VkInstance          vkengine_get_inst    (VkEngine e);
+//VkPhysicalDevice    vkengine_select_phy  (VkEngine e, VkPhysicalDeviceType preferedPhyType);
 vkh_public
-VkhApp              vkh_app_create      (uint32_t version_major, uint32_t version_minor,
-                                                                                 const char* app_name, uint32_t enabledLayersCount, const char **enabledLayers, uint32_t ext_count, const char* extensions[]);
+VkhPhyInfo*         vkengine_get_phyinfos    (VkEngine e, uint32_t* count, VkSurfaceKHR surface);
 vkh_public
-void                vkh_app_destroy     (VkhApp app);
+void                vkengine_free_phyinfos   (uint32_t count, VkhPhyInfo* infos);
 vkh_public
-VkInstance          vkh_app_get_inst    (VkhApp app);
-//VkPhysicalDevice    vkh_app_select_phy  (VkhApp app, VkPhysicalDeviceType preferedPhyType);
-vkh_public
-VkhPhyInfo*         vkh_app_get_phyinfos    (VkhApp app, uint32_t* count, VkSurfaceKHR surface);
-vkh_public
-void                vkh_app_free_phyinfos   (uint32_t count, VkhPhyInfo* infos);
-vkh_public
-void                vkh_app_enable_debug_messenger (VkhApp app, VkDebugUtilsMessageTypeFlagsEXT typeFlags,
+void                vkengine_enable_debug_messenger (VkEngine e, VkDebugUtilsMessageTypeFlagsEXT typeFlags,
                                                                 VkDebugUtilsMessageSeverityFlagsEXT severityFlags,
                                                                 PFN_vkDebugUtilsMessengerCallbackEXT callback);
 
 vkh_public
-VkPhysicalDeviceProperties vkh_app_get_phy_properties (VkhApp app, uint32_t phyIndex);
+VkPhysicalDeviceProperties vkengine_get_phy_properties (VkEngine e, uint32_t phyIndex);
 
 /*************
  * VkhPhy    *
  *************/
 vkh_public
 VkhPhyInfo          vkh_phyinfo_create		(VkPhysicalDevice phy, VkSurfaceKHR surface);
+
+VkhPhyInfo          vkh_phyinfo_grab        (VkhPhyInfo phy);
+
 vkh_public
-void                vkh_phyinfo_destroy		(VkhPhyInfo phy);
+void                vkh_phyinfo_drop		(VkhPhyInfo phy);
 
 vkh_public
 VkPhysicalDeviceProperties          vkh_phyinfo_get_properties          (VkhPhyInfo phy);
@@ -210,25 +207,17 @@ bool vkh_phyinfo_try_get_extension_properties (VkhPhyInfo phy, const char* name,
 /*************
  * VkhDevice *
  *************/
-vkh_public
-VkhDevice           vkh_device_create           (VkhApp app, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info);
-vkh_public
-VkhDevice           vkh_device_import           (VkInstance inst, VkPhysicalDevice phy, VkDevice vkDev);
-vkh_public
-void                vkh_device_destroy          (VkhDevice dev);
+vkh_public VkhDevice           vkh_device_create           (VkEngine e, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info);
+vkh_public VkhDevice           vkh_device_import           (VkInstance inst, VkPhysicalDevice phy, VkDevice vkDev);
+vkh_public void                vkh_device_destroy          (VkhDevice dev);
 vkh_public
 void                vkh_device_init_debug_utils (VkhDevice dev);
 vkh_public
 VkDevice            vkh_device_get_vkdev        (VkhDevice dev);
 vkh_public
 VkPhysicalDevice    vkh_device_get_phy          (VkhDevice dev);
-/**
- * @brief Retrieve @ref VkhApp instance used to create this VkhDevice.
- * @param dev
- * @return the VkhApp instace used to create the VkhDevice.
- */
-vkh_public
-VkhApp	vkh_device_get_app	(VkhDevice dev);
+
+vkh_public VkEngine vkh_device_get_engine (VkhDevice dev);
 
 vkh_public
 void vkh_device_set_object_name (VkhDevice dev, VkObjectType objectType, uint64_t handle, const char *name);

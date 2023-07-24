@@ -23,8 +23,15 @@
 #include <vkh/vkh_app.h>
 
 
+VkhPhyInfo vkh_phyinfo_grab(VkhPhyInfo pi) {
+	if (pi)
+		pi->refs++;
+	return pi;
+}
+
 VkhPhyInfo vkh_phyinfo_create (VkPhysicalDevice phy, VkSurfaceKHR surface) {
 	VkhPhyInfo pi = (vkh_phy_t*)calloc(1, sizeof(vkh_phy_t));
+	pi->refs = 1;
 	pi->phy = phy;
 
 	vkGetPhysicalDeviceFeatures (phy, &pi->supportedFeatures);
@@ -89,11 +96,13 @@ VkhPhyInfo vkh_phyinfo_create (VkPhysicalDevice phy, VkSurfaceKHR surface) {
 	return pi;
 }
 
-void vkh_phyinfo_destroy (VkhPhyInfo phy) {
-	if (phy->pExtensionProperties != NULL)
-		free(phy->pExtensionProperties);
-	free(phy->queues);
-	free(phy);
+void vkh_phyinfo_drop (VkhPhyInfo phy) {
+	if (phy && --phy->refs == 0) {
+		if (phy->pExtensionProperties != NULL)
+			free(phy->pExtensionProperties);
+		free(phy->queues);
+		free(phy);
+	}
 }
 
 VkPhysicalDeviceProperties vkh_phyinfo_get_properties (VkhPhyInfo phy) {

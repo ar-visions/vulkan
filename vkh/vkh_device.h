@@ -36,14 +36,15 @@ extern "C" {
 typedef struct _vkh_device_t{
 	VkDevice				dev;
 	VkhPhyInfo			    phyinfo;			  /// create this from existing VkPhysicalDevice in cases where its not set.
-	VkPhysicalDeviceMemoryProperties phyMemProps; /// deprecate
-	VkPhysicalDevice		phy; 				  /// deprecate
-	VkInstance				instance; 			  /// deprecate
+	VkEngine				e;
+	//VkPhysicalDeviceMemoryProperties phyMemProps; /// deprecate
+	//VkPhysicalDevice		phy; 				  /// deprecate
+	//VkInstance				instance; 			  /// deprecate
 #ifdef VKH_USE_VMA
-	VmaAllocator			allocator;
+	VmaAllocator						allocator;
 #endif
-	VkhApp					vkhApplication;
-}vkh_device_t;
+
+} vkh_device_t;
 
 #ifdef __cplusplus
 }

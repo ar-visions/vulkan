@@ -109,11 +109,12 @@ const void* vkh_get_device_requirements (VkPhysicalDevice phy, VkPhysicalDeviceF
 }
 
 
-VkhDevice vkh_device_create (VkhApp app, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info){
+VkhDevice vkh_device_create (VkEngine e, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info){
 	VkDevice dev;
 	VK_CHECK_RESULT(vkCreateDevice (phyInfo->phy, pDevice_info, NULL, &dev));
-	VkhDevice vkhd = vkh_device_import(app->inst, phyInfo->phy, dev);
-	vkhd->vkhApplication = app;
+	VkhDevice vkhd = vkh_device_import(e->inst, phyInfo->phy, dev);
+	vkhd->e = e;
+	vkhd->phyinfo = vkh_phyinfo_grab(phyInfo);
 	return vkhd;
 }
 VkhDevice vkh_device_import (VkInstance inst, VkPhysicalDevice phy, VkDevice vkDev) {
@@ -140,8 +141,8 @@ VkDevice vkh_device_get_vkdev (VkhDevice dev) {
 VkPhysicalDevice vkh_device_get_phy (VkhDevice dev) {
 	return dev->phy;
 }
-VkhApp vkh_device_get_app (VkhDevice dev) {
-	return dev->vkhApplication;
+VkEngine vkh_device_get_engine (VkhDevice dev) {
+	return dev->e;
 }
 /**
  * @brief get instance proc addresses for debug utils (name, label,...)

@@ -29,6 +29,7 @@ extern "C" {
 #include <vkh/vkh.h>
 
 typedef struct _vkh_phy_t{
+	int									refs;
 	VkPhysicalDevice					phy;
 	VkPhysicalDeviceMemoryProperties	memProps;
 	VkPhysicalDeviceProperties			properties;
