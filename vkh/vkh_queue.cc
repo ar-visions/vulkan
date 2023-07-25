@@ -29,18 +29,12 @@ VkhQueue _init_queue (VkhDevice vkh) {
 	return q;
 }
 
-
 VkhQueue vkh_queue_create (VkhDevice vkh, uint32_t familyIndex, uint32_t qIndex) {
 	VkhQueue q	= _init_queue (vkh);
 	q->familyIndex	= familyIndex;
 	vkGetDeviceQueue (vkh->device, familyIndex, qIndex, &q->queue);
 	return q;
 }
-
-//VkhQueue vkh_queue_find (VkhDevice dev, VkQueueFlags flags) {
-
-//	  return q;
-//}
 
 void vkh_queue_destroy (VkhQueue queue){
 	vkh_device_drop(queue->vkh);
