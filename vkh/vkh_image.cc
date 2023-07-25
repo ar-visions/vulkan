@@ -22,7 +22,7 @@
 #include <vkh/vkh_image.h>
 #include <vkh/vkh_device.h>
 
-VkhImage _vkh_image_create (VkhDevice pDev, VkImageType imageType,
+VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 				  VkFormat format, uint32_t width, uint32_t height,
 				  VkhMemoryUsage memprops, VkImageUsageFlags usage,
 				  VkSampleCountFlagBits samples, VkImageTiling tiling,
@@ -30,7 +30,7 @@ VkhImage _vkh_image_create (VkhDevice pDev, VkImageType imageType,
 
 	VkhImage img = (VkhImage)calloc(1,sizeof(vkh_image_t));
 
-	img->pDev = pDev;
+	img->vkh = vkh;
 
 	VkImageCreateInfo* pInfo = &img->infos;
 	pInfo->sType			= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -55,20 +55,20 @@ VkhImage _vkh_image_create (VkhDevice pDev, VkImageType imageType,
 	img->view	= VK_NULL_HANDLE;*/
 #ifdef VKH_USE_VMA
 	VmaAllocationCreateInfo allocInfo = { .usage = (VmaMemoryUsage)memprops };
-	VK_CHECK_RESULT(vmaCreateImage (pDev->allocator, pInfo, &allocInfo, &img->image, &img->alloc, &img->allocInfo));
+	VK_CHECK_RESULT(vmaCreateImage (vkh->allocator, pInfo, &allocInfo, &img->image, &img->alloc, &img->allocInfo));
 #else
-	VK_CHECK_RESULT(vkCreateImage(pDev->dev, pInfo, NULL, &img->image));
+	VK_CHECK_RESULT(vkCreateImage(vkh->device, pInfo, NULL, &img->image));
 	VkMemoryRequirements memReq;
-	vkGetImageMemoryRequirements(pDev->dev, img->image, &memReq);
+	vkGetImageMemoryRequirements(vkh->device, img->image, &memReq);
 	VkMemoryAllocateInfo memAllocInfo = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 										  .allocationSize = memReq.size };
-	vkh_memory_type_from_properties(&pDev->e->memory_properties, memReq.memoryTypeBits, memprops,&memAllocInfo.memoryTypeIndex);
-	VK_CHECK_RESULT(vkAllocateMemory(pDev->dev, &memAllocInfo, NULL, &img->memory));
-	VK_CHECK_RESULT(vkBindImageMemory(pDev->dev, img->image, img->memory, 0));
+	vkh_memory_type_from_properties(&vkh->e->memory_properties, memReq.memoryTypeBits, memprops,&memAllocInfo.memoryTypeIndex);
+	VK_CHECK_RESULT(vkAllocateMemory(vkh->device, &memAllocInfo, NULL, &img->memory));
+	VK_CHECK_RESULT(vkBindImageMemory(vkh->device, img->image, img->memory, 0));
 #endif
 
 	mtx_init(&img->mutex, mtx_plain);
-	img->references = 1;
+	img->refs = 1;
 
 	return img;
 }
@@ -78,8 +78,8 @@ void vkh_image_destroy(VkhImage img)
 		return;
 
 	mtx_lock (&img->mutex);
-	img->references--;
-	if (img->references > 0) {
+	img->refs--;
+	if (img->refs > 0) {
 		mtx_unlock (&img->mutex);
 		return;
 	}
@@ -88,16 +88,16 @@ void vkh_image_destroy(VkhImage img)
 	mtx_destroy (&img->mutex);
 
 	if(img->view != VK_NULL_HANDLE)
-		vkDestroyImageView (img->pDev->dev,img->view, NULL);
+		vkDestroyImageView (img->vkh->dev,img->view, NULL);
 	if(img->sampler != VK_NULL_HANDLE)
-		vkDestroySampler (img->pDev->dev,img->sampler, NULL);
+		vkDestroySampler (img->vkh->dev,img->sampler, NULL);
 
 	if (!img->imported) {
 #ifdef VKH_USE_VMA
-		vmaDestroyImage	(img->pDev->allocator, img->image, img->alloc);
+		vmaDestroyImage	(img->vkh->allocator, img->image, img->alloc);
 #else
-		vkDestroyImage	(img->pDev->dev, img->image, NULL);
-		vkFreeMemory	(img->pDev->dev, img->memory, NULL);
+		vkDestroyImage	(img->vkh->dev, img->image, NULL);
+		vkFreeMemory	(img->vkh->dev, img->memory, NULL);
 
 #endif
 	}
@@ -108,27 +108,27 @@ void vkh_image_destroy(VkhImage img)
 }
 void vkh_image_reference (VkhImage img) {
 	mtx_lock	(&img->mutex);
-	img->references++;
+	img->refs++;
 	mtx_unlock	(&img->mutex);
 }
-VkhImage vkh_tex2d_array_create (VkhDevice pDev,
+VkhImage vkh_tex2d_array_create (VkhDevice vkh,
 							 VkFormat format, uint32_t width, uint32_t height, uint32_t layers,
 							 VkhMemoryUsage memprops, VkImageUsageFlags usage){
-	return _vkh_image_create (pDev, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
+	return _vkh_image_create (vkh, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
 		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 1, layers);
 }
-VkhImage vkh_image_create (VkhDevice pDev,
+VkhImage vkh_image_create (VkhDevice vkh,
 						   VkFormat format, uint32_t width, uint32_t height, VkImageTiling tiling,
 						   VkhMemoryUsage memprops,
 						   VkImageUsageFlags usage)
 {
-	return _vkh_image_create (pDev, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
+	return _vkh_image_create (vkh, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
 					  VK_SAMPLE_COUNT_1_BIT, tiling, 1, 1);
 }
 //create vkhImage from existing VkImage
-VkhImage vkh_image_import (VkhDevice pDev, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height) {
+VkhImage vkh_image_import (VkhDevice vkh, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height) {
 	VkhImage img = (VkhImage)calloc(1,sizeof(vkh_image_t));
-	img->pDev		= pDev;
+	img->vkh		= vkh;
 	img->image		= vkImg;
 	img->imported	= true;
 
@@ -141,22 +141,22 @@ VkhImage vkh_image_import (VkhDevice pDev, VkImage vkImg, VkFormat format, uint3
 	pInfo->mipLevels		= 1;
 	pInfo->arrayLayers		= 1;
 	//pInfo->samples		= samples;
-	img->references			= 1;
+	img->refs   			= 1;
 
 	mtx_init (&img->mutex, mtx_plain);
 
 	return img;
 }
-VkhImage vkh_image_ms_create(VkhDevice pDev,
+VkhImage vkh_image_ms_create(VkhDevice vkh,
 						   VkFormat format, VkSampleCountFlagBits num_samples, uint32_t width, uint32_t height,
 						   VkhMemoryUsage memprops,
 						   VkImageUsageFlags usage){
-   return  _vkh_image_create (pDev, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
+   return  _vkh_image_create (vkh, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
 					  num_samples, VK_IMAGE_TILING_OPTIMAL, 1, 1);
 }
 void vkh_image_create_view (VkhImage img, VkImageViewType viewType, VkImageAspectFlags aspectFlags){
 	if(img->view != VK_NULL_HANDLE)
-		vkDestroyImageView	(img->pDev->dev,img->view,NULL);
+		vkDestroyImageView	(img->vkh->dev,img->view,NULL);
 
 	VkImageViewCreateInfo viewInfo = { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 										 .image = img->image,
@@ -164,12 +164,12 @@ void vkh_image_create_view (VkhImage img, VkImageViewType viewType, VkImageAspec
 										 .format = img->infos.format,
 										 .components = {VK_COMPONENT_SWIZZLE_R,VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A},
 										 .subresourceRange = {aspectFlags,0,1,0,img->infos.arrayLayers}};
-	VK_CHECK_RESULT(vkCreateImageView(img->pDev->dev, &viewInfo, NULL, &img->view));
+	VK_CHECK_RESULT(vkCreateImageView(img->vkh->dev, &viewInfo, NULL, &img->view));
 }
 void vkh_image_create_sampler (VkhImage img, VkFilter magFilter, VkFilter minFilter,
 							   VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode){
 	if(img->sampler != VK_NULL_HANDLE)
-		vkDestroySampler	(img->pDev->dev,img->sampler,NULL);
+		vkDestroySampler	(img->vkh->dev,img->sampler,NULL);
 	VkSamplerCreateInfo samplerCreateInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 											  .maxAnisotropy= 1.0,
 											  .addressModeU = addressMode,
@@ -178,7 +178,7 @@ void vkh_image_create_sampler (VkhImage img, VkFilter magFilter, VkFilter minFil
 											  .magFilter	= magFilter,
 											  .minFilter	= minFilter,
 											  .mipmapMode	= mipmapMode};
-	VK_CHECK_RESULT(vkCreateSampler(img->pDev->dev, &samplerCreateInfo, NULL, &img->sampler));
+	VK_CHECK_RESULT(vkCreateSampler(img->vkh->dev, &samplerCreateInfo, NULL, &img->sampler));
 }
 void vkh_image_set_sampler (VkhImage img, VkSampler sampler){
 	img->sampler = sampler;
@@ -273,32 +273,32 @@ void vkh_image_destroy_sampler (VkhImage img) {
 	if (img==NULL)
 		return;
 	if(img->sampler != VK_NULL_HANDLE)
-		vkDestroySampler	(img->pDev->dev,img->sampler,NULL);
+		vkDestroySampler	(img->vkh->dev,img->sampler,NULL);
 	img->sampler = VK_NULL_HANDLE;
 }
 
 void* vkh_image_map (VkhImage img) {
 	void* data;
 #ifdef VKH_USE_VMA
-	vmaMapMemory(img->pDev->allocator, img->alloc, &data);
+	vmaMapMemory(img->vkh->allocator, img->alloc, &data);
 #else
 #endif
 	return data;
 }
 void vkh_image_unmap (VkhImage img) {
 #ifdef VKH_USE_VMA
-	vmaUnmapMemory(img->pDev->allocator, img->alloc);
+	vmaUnmapMemory(img->vkh->allocator, img->alloc);
 #else
 #endif
 }
 void vkh_image_set_name (VkhImage img, const char* name){
 	if (img==NULL)
 		return;
-	vkh_device_set_object_name(img->pDev, VK_OBJECT_TYPE_IMAGE, (uint64_t)img->image, name);
+	vkh_device_set_object_name(img->vkh, VK_OBJECT_TYPE_IMAGE, (uint64_t)img->image, name);
 }
 uint64_t vkh_image_get_stride (VkhImage img) {
 	VkImageSubresource subres = {VK_IMAGE_ASPECT_COLOR_BIT,0,0};
 	VkSubresourceLayout layout = {0};
-	vkGetImageSubresourceLayout(img->pDev->dev, img->image, &subres, &layout);
+	vkGetImageSubresourceLayout(img->vkh->dev, img->image, &subres, &layout);
 	return (uint64_t) layout.rowPitch;
 }

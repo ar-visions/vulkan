@@ -34,7 +34,7 @@
 
 //using namespace ion; /// bad form but its important
 
-#define FENCE_TIMEOUT 100000000
+#define FENCE_TIMEOUT UINT16_MAX
 
 //console colors for debug output on stdout with debug utils or debug report
 #ifdef __unix__
@@ -57,17 +57,22 @@
 struct GLFWwindow;
 
 /// merging app & engine makes sense.
+/// also reducing down what is in vkvg: redundancy in copies of vkh device data and its props (replaced with methods)
 typedef struct _vk_engine_t {
-	int									refs;
+	size_t								refs;
 	ion::GPU							vk_gpu;
 	ion::Device							vk_device;
 	VkhPhyInfo							pi;
 	VkInstance							inst;
 	VkPhysicalDeviceMemoryProperties	memory_properties;
 	VkPhysicalDeviceProperties			gpu_props;
-	VkhDevice							dev;
+	VkhDevice							vkh;
 	struct GLFWwindow*					window;
 	VkhPresenter						renderer;
+	VkSampleCountFlagBits				max_samples;
+#ifdef VKH_USE_VMA
+	VmaAllocator						allocator;
+#endif
 	///
 } vk_engine_t;
 
@@ -79,7 +84,8 @@ typedef void (*GLFWcharfun)(struct GLFWwindow*, unsigned int);
 
 vk_engine_t*   vkengine_create(
 	uint32_t version_major, uint32_t version_minor, const char* app_name,
-	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, uint32_t width, uint32_t height, int dpi_index);
+	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, VkSampleCountFlagBits max_samples, /// max_samples is a soft max for users of the app; it must also be checked against the hardware sample max
+	uint32_t width, uint32_t height, int dpi_index);
 
 void 				vkengine_dump_available_layers   	();
 bool 				vkengine_try_get_phyinfo 			(VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy);

@@ -200,20 +200,14 @@ bool vkh_phyinfo_create_compute_queues		(VkhPhyInfo phy, uint32_t queueCount, co
 
 vkh_public
 bool vkh_phyinfo_try_get_extension_properties (VkhPhyInfo phy, const char* name, const VkExtensionProperties* properties);
-/*************
- * VkhDevice *
- *************/
-vkh_public VkhDevice           vkh_device_create           (VkEngine e, VkhPhyInfo phyInfo, VkDeviceCreateInfo* pDevice_info);
-vkh_public VkhDevice           vkh_device_import           (VkEngine e, VkPhysicalDevice phy, VkDevice vkDev);
-vkh_public void                vkh_device_destroy          (VkhDevice dev);
-vkh_public
-void                vkh_device_init_debug_utils (VkhDevice dev);
-vkh_public
-VkDevice            vkh_device_get_vkdev        (VkhDevice dev);
-vkh_public
-VkPhysicalDevice    vkh_device_get_phy          (VkhDevice dev);
 
-vkh_public VkEngine vkh_device_get_engine (VkhDevice dev);
+vkh_public VkhDevice           vkh_device_import           (VkEngine e);
+vkh_public void                vkh_device_drop             (VkhDevice dev);
+vkh_public VkhDevice           vkh_device_grab             (VkhDevice dev);
+vkh_public void                vkh_device_init_debug_utils (VkhDevice dev);
+vkh_public VkDevice            vkh_device_get_vkdev        (VkhDevice dev);
+vkh_public VkPhysicalDevice    vkh_device_get_phy          (VkhDevice dev);
+vkh_public VkEngine            vkh_device_get_engine       (VkhDevice dev);
 
 vkh_public
 void vkh_device_set_object_name (VkhDevice dev, VkObjectType objectType, uint64_t handle, const char *name);
@@ -247,15 +241,15 @@ void		vkh_presenter_get_size			(VkhPresenter r, uint32_t* pWidth, uint32_t* pHei
  * VkhImage *
  ************/
 vkh_public
-VkhImage vkh_image_import       (VkhDevice pDev, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height);
+VkhImage vkh_image_import       (VkhDevice vkh, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height);
 vkh_public
-VkhImage vkh_image_create       (VkhDevice pDev, VkFormat format, uint32_t width, uint32_t height, VkImageTiling tiling,
+VkhImage vkh_image_create       (VkhDevice vkh, VkFormat format, uint32_t width, uint32_t height, VkImageTiling tiling,
                                                                         VkhMemoryUsage memprops, VkImageUsageFlags usage);
 vkh_public
-VkhImage vkh_image_ms_create    (VkhDevice pDev, VkFormat format, VkSampleCountFlagBits num_samples, uint32_t width, uint32_t height,
+VkhImage vkh_image_ms_create    (VkhDevice vkh, VkFormat format, VkSampleCountFlagBits num_samples, uint32_t width, uint32_t height,
                                                                         VkhMemoryUsage memprops, VkImageUsageFlags usage);
 vkh_public
-VkhImage vkh_tex2d_array_create (VkhDevice pDev, VkFormat format, uint32_t width, uint32_t height, uint32_t layers,
+VkhImage vkh_tex2d_array_create (VkhDevice vkh, VkFormat format, uint32_t width, uint32_t height, uint32_t layers,
                                                                         VkhMemoryUsage memprops, VkImageUsageFlags usage);
 vkh_public
 void vkh_image_set_sampler      (VkhImage img, VkSampler sampler);
@@ -303,10 +297,10 @@ VkDescriptorImageInfo   vkh_image_get_descriptor(VkhImage img, VkImageLayout ima
  * VkhBuffer *
  *************/
 vkh_public
-void		vkh_buffer_init		(VkhDevice pDev, VkBufferUsageFlags usage,
+void		vkh_buffer_init		(VkhDevice vkh, VkBufferUsageFlags usage,
                                                                         VkhMemoryUsage memprops, VkDeviceSize size, VkhBuffer buff, bool mapped);
 vkh_public
-VkhBuffer   vkh_buffer_create   (VkhDevice pDev, VkBufferUsageFlags usage,
+VkhBuffer   vkh_buffer_create   (VkhDevice vkh, VkBufferUsageFlags usage,
                                                                         VkhMemoryUsage memprops, VkDeviceSize size);
 vkh_public
 void        vkh_buffer_destroy  (VkhBuffer buff);

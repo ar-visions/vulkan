@@ -30,7 +30,7 @@
 #endif
 
 typedef struct _vkh_buffer_t {
-	VkhDevice				pDev;
+	VkhDevice				vkh;
 	VkBufferCreateInfo		infos;
 	VkBuffer				buffer;
 #ifdef VKH_USE_VMA

@@ -29,16 +29,14 @@
 #include "vk_mem_alloc.h"
 #endif
 
-typedef struct _vkh_device_t{
+typedef struct _vkh_device_t {
+	size_t					refs;
 	VkDevice				dev;
-	VkhPhyInfo			    phyinfo;			  /// create this from existing VkPhysicalDevice in cases where its not set.
 	VkEngine				e;
-	//VkPhysicalDeviceMemoryProperties phyMemProps; /// deprecate
-	//VkPhysicalDevice		phy; 				  /// deprecate
-	//VkInstance				instance; 			  /// deprecate
-#ifdef VKH_USE_VMA
-	VmaAllocator						allocator;
-#endif
+
+	VkInstance   instance() { return e->vk_gpu->instance; }
+	VkPhysicalDevice phys() { return e->vk_gpu->phys; }
+	VkDevice       device() { return e->vk_device->device; }
 
 } vkh_device_t;
 

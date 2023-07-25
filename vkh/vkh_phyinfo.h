@@ -25,7 +25,7 @@
 #include <vkh/vkh.h>
 
 typedef struct _vkh_phy_t{
-	int									refs;
+	size_t								refs;
 	VkPhysicalDevice					phy;
 	VkPhysicalDeviceMemoryProperties	memProps;
 	VkPhysicalDeviceProperties			properties;

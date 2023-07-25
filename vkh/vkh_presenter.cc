@@ -31,27 +31,25 @@
 # define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #endif
 
-#define FENCE_TIMEOUT UINT16_MAX
-
 void vkh_presenter_create_swapchain	 (VkhPresenter r);
 void _swapchain_destroy (VkhPresenter r);
 void _init_phy_surface	(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR presentMode);
 
-VkhPresenter vkh_presenter_create (VkhDevice dev, uint32_t presentQueueFamIdx, VkSurfaceKHR surface, uint32_t width, uint32_t height,
+VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, VkSurfaceKHR surface, uint32_t width, uint32_t height,
 						   VkFormat preferedFormat, VkPresentModeKHR presentMode) {
 	VkhPresenter r = (VkhPresenter)calloc(1,sizeof(vkh_presenter_t));
 
-	r->dev = dev;
+	r->vkh = vkh;
 	r->qFam = presentQueueFamIdx ;
 	r->surface = surface;
 	r->width = width;
 	r->height = height;
-	vkGetDeviceQueue(r->dev->dev, r->qFam, 0, &r->queue);
+	vkGetDeviceQueue(r->vkh->device, r->qFam, 0, &r->queue);
 
-	r->cmdPool			= vkh_cmd_pool_create  (r->dev, presentQueueFamIdx, 0);
-	r->semaPresentEnd	= vkh_semaphore_create (r->dev);
-	r->semaDrawEnd		= vkh_semaphore_create (r->dev);
-	r->fenceDraw		= vkh_fence_create_signaled(r->dev);
+	r->cmdPool			= vkh_cmd_pool_create  (r->vkh, presentQueueFamIdx, 0);
+	r->semaPresentEnd	= vkh_semaphore_create (r->vkh);
+	r->semaDrawEnd		= vkh_semaphore_create (r->vkh);
+	r->fenceDraw		= vkh_fence_create_signaled(r->vkh);
 
 	_init_phy_surface (r, preferedFormat, presentMode);
 
@@ -61,14 +59,14 @@ VkhPresenter vkh_presenter_create (VkhDevice dev, uint32_t presentQueueFamIdx, V
 }
 
 void vkh_presenter_destroy (VkhPresenter r) {
-	vkDeviceWaitIdle (r->dev->dev);
+	vkDeviceWaitIdle (r->vkh->dev);
 
 	_swapchain_destroy (r);
 
-	vkDestroySemaphore	(r->dev->dev, r->semaDrawEnd, NULL);
-	vkDestroySemaphore	(r->dev->dev, r->semaPresentEnd, NULL);
-	vkDestroyFence		(r->dev->dev, r->fenceDraw, NULL);
-	vkDestroyCommandPool(r->dev->dev, r->cmdPool, NULL);
+	vkDestroySemaphore	(r->vkh->device, r->semaDrawEnd, NULL);
+	vkDestroySemaphore	(r->vkh->device, r->semaPresentEnd, NULL);
+	vkDestroyFence		(r->vkh->device, r->fenceDraw, NULL);
+	vkDestroyCommandPool(r->vkh->device, r->cmdPool, NULL);
 
 	free (r);
 }
@@ -76,7 +74,7 @@ void vkh_presenter_destroy (VkhPresenter r) {
 bool vkh_presenter_acquireNextImage (VkhPresenter r, VkFence fence, VkSemaphore semaphore) {
 	// Get the index of the next available swapchain image:
 	VkResult err = vkAcquireNextImageKHR
-			(r->dev->dev, r->swapChain, UINT64_MAX, semaphore, fence, &r->currentScBufferIndex);
+			(r->vkh->dev, r->swapChain, UINT64_MAX, semaphore, fence, &r->currentScBufferIndex);
 	return ((err != VK_ERROR_OUT_OF_DATE_KHR) && (err != VK_SUBOPTIMAL_KHR));
 }
 
@@ -97,8 +95,8 @@ bool vkh_presenter_draw (VkhPresenter r) {
 								 .pWaitDstStageMask = &dstStageMask,
 								 .pCommandBuffers = &r->cmdBuffs[r->currentScBufferIndex]};
 
-	vkWaitForFences	(r->dev->dev, 1, &r->fenceDraw, VK_TRUE, FENCE_TIMEOUT);
-	vkResetFences	(r->dev->dev, 1, &r->fenceDraw);
+	vkWaitForFences	(r->vkh->device, 1, &r->fenceDraw, VK_TRUE, FENCE_TIMEOUT);
+	vkResetFences	(r->vkh->device, 1, &r->fenceDraw);
 
 	VK_CHECK_RESULT(vkQueueSubmit (r->queue, 1, &submit_info, r->fenceDraw));
 
@@ -168,10 +166,10 @@ void vkh_presenter_get_size (VkhPresenter r, uint32_t* pWidth, uint32_t* pHeight
 }
 void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR presentMode){
 	uint32_t count;
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->dev->e->vk_gpu->phys, r->surface, &count, NULL));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->vkh->e->vk_gpu->phys, r->surface, &count, NULL));
 	assert (count>0);
 	VkSurfaceFormatKHR* formats = (VkSurfaceFormatKHR*)malloc(count * sizeof(VkSurfaceFormatKHR));
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->dev->e->vk_gpu->phys, r->surface, &count, formats));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceFormatsKHR (r->vkh->e->vk_gpu->phys, r->surface, &count, formats));
 
 	for (uint32_t i=0; i<count; i++){
 		if (formats[i].format == preferedFormat) {
@@ -182,10 +180,10 @@ void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR
 	}
 	assert (r->format != VK_FORMAT_UNDEFINED);
 
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->dev->e->vk_gpu->phys, r->surface, &count, NULL));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->vkh->e->vk_gpu->phys, r->surface, &count, NULL));
 	assert (count>0);
 	VkPresentModeKHR* presentModes = (VkPresentModeKHR*)malloc(count * sizeof(VkPresentModeKHR));
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->dev->e->vk_gpu->phys, r->surface, &count, presentModes));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfacePresentModesKHR(r->vkh->e->vk_gpu->phys, r->surface, &count, presentModes));
 	r->presentMode =(VkPresentModeKHR)-1;
 	for (uint32_t i=0; i<count; i++){
 		if (presentModes[i] == presentMode) {
@@ -202,10 +200,10 @@ void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR
 
 void vkh_presenter_create_swapchain (VkhPresenter r){
 	// Ensure all operations on the device have been finished before destroying resources
-	vkDeviceWaitIdle(r->dev->dev);
+	vkDeviceWaitIdle(r->vkh->dev);
 
 	VkSurfaceCapabilitiesKHR surfCapabilities;
-	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(r->dev->e->vk_gpu->phys, r->surface, &surfCapabilities));
+	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(r->vkh->e->vk_gpu->phys, r->surface, &surfCapabilities));
 	assert (surfCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
 	// width and height are either both 0xFFFFFFFF, or both not 0xFFFFFFFF.
@@ -242,16 +240,16 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 											.clipped = VK_TRUE,
 											.oldSwapchain = r->swapChain};
 
-	VK_CHECK_RESULT(vkCreateSwapchainKHR (r->dev->dev, &createInfo, NULL, &newSwapchain));
+	VK_CHECK_RESULT(vkCreateSwapchainKHR (r->vkh->dev, &createInfo, NULL, &newSwapchain));
 	if (r->swapChain != VK_NULL_HANDLE)
 		_swapchain_destroy(r);
 	r->swapChain = newSwapchain;
 
-	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->dev->dev, r->swapChain, &r->imgCount, NULL));
+	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->vkh->dev, r->swapChain, &r->imgCount, NULL));
 	assert (r->imgCount>0);
 
 	VkImage* images = (VkImage*)malloc(r->imgCount * sizeof(VkImage));
-	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->dev->dev, r->swapChain, &r->imgCount, images));
+	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->vkh->dev, r->swapChain, &r->imgCount, images));
 
 	r->ScBuffers = (VkhImage*)		malloc (r->imgCount * sizeof(VkhImage));
 	r->cmdBuffs = (VkCommandBuffer*)malloc (r->imgCount * sizeof(VkCommandBuffer));
@@ -271,9 +269,9 @@ void _swapchain_destroy (VkhPresenter r){
 	for (uint32_t i = 0; i < r->imgCount; i++)
 	{
 		vkh_image_destroy (r->ScBuffers [i]);
-		vkFreeCommandBuffers (r->dev->dev, r->cmdPool, 1, &r->cmdBuffs[i]);
+		vkFreeCommandBuffers (r->vkh->dev, r->cmdPool, 1, &r->cmdBuffs[i]);
 	}
-	vkDestroySwapchainKHR (r->dev->dev, r->swapChain, NULL);
+	vkDestroySwapchainKHR (r->vkh->dev, r->swapChain, NULL);
 	r->swapChain = VK_NULL_HANDLE;
 	free(r->ScBuffers);
 	free(r->cmdBuffs);

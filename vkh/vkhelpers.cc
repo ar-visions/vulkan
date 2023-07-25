@@ -24,31 +24,31 @@
 
 #define CHECK_BIT(var,pos) (((var)>>(pos)) & 1)
 
-VkFence vkh_fence_create (VkhDevice dev) {
+VkFence vkh_fence_create (VkhDevice vkh) {
 	VkFence fence;
 	VkFenceCreateInfo fenceInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 									.pNext = NULL,
 									.flags = 0 };
-	VK_CHECK_RESULT(vkCreateFence(dev->dev, &fenceInfo, NULL, &fence));
+	VK_CHECK_RESULT(vkCreateFence(vkh->dev, &fenceInfo, NULL, &fence));
 	return fence;
 }
-VkFence vkh_fence_create_signaled (VkhDevice dev) {
+VkFence vkh_fence_create_signaled (VkhDevice vkh) {
 	VkFence fence;
 	VkFenceCreateInfo fenceInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 									.pNext = NULL,
 									.flags = VK_FENCE_CREATE_SIGNALED_BIT };
-	VK_CHECK_RESULT(vkCreateFence(dev->dev, &fenceInfo, NULL, &fence));
+	VK_CHECK_RESULT(vkCreateFence(vkh->dev, &fenceInfo, NULL, &fence));
 	return fence;
 }
-VkSemaphore vkh_semaphore_create (VkhDevice dev) {
+VkSemaphore vkh_semaphore_create (VkhDevice vkh) {
 	VkSemaphore semaphore;
 	VkSemaphoreCreateInfo info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 								   .pNext = NULL,
 								   .flags = 0};
-	VK_CHECK_RESULT(vkCreateSemaphore(dev->dev, &info, NULL, &semaphore));
+	VK_CHECK_RESULT(vkCreateSemaphore(vkh->dev, &info, NULL, &semaphore));
 	return semaphore;
 }
-VkSemaphore vkh_timeline_create (VkhDevice dev, uint64_t initialValue) {
+VkSemaphore vkh_timeline_create (VkhDevice vkh, uint64_t initialValue) {
 	VkSemaphore semaphore;
 	VkSemaphoreTypeCreateInfo timelineInfo = {
 		.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO, .pNext = NULL,
@@ -57,11 +57,11 @@ VkSemaphore vkh_timeline_create (VkhDevice dev, uint64_t initialValue) {
 	VkSemaphoreCreateInfo info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 								   .pNext = &timelineInfo,
 								   .flags = 0};
-	VK_CHECK_RESULT(vkCreateSemaphore(dev->dev, &info, NULL, &semaphore));
+	VK_CHECK_RESULT(vkCreateSemaphore(vkh->dev, &info, NULL, &semaphore));
 	return semaphore;
 }
 
-VkResult vkh_timeline_wait (VkhDevice dev, VkSemaphore timeline, const uint64_t wait) {
+VkResult vkh_timeline_wait (VkhDevice vkh, VkSemaphore timeline, const uint64_t wait) {
 	VkSemaphoreWaitInfo waitInfo;
 	waitInfo.sType			= VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
 	waitInfo.pNext			= NULL;
@@ -70,7 +70,7 @@ VkResult vkh_timeline_wait (VkhDevice dev, VkSemaphore timeline, const uint64_t 
 	waitInfo.pSemaphores	= &timeline;
 	waitInfo.pValues		= &wait;
 
-	return vkWaitSemaphores(dev->dev, &waitInfo, UINT64_MAX);
+	return vkWaitSemaphores(vkh->dev, &waitInfo, UINT64_MAX);
 }
 void vkh_cmd_submit_timelined (VkhQueue queue, VkCommandBuffer *pCmdBuff, VkSemaphore timeline, const uint64_t wait, const uint64_t signal) {
 	static VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
@@ -118,38 +118,38 @@ void vkh_cmd_submit_timelined2 (VkhQueue queue, VkCommandBuffer *pCmdBuff, VkSem
 
 	VK_CHECK_RESULT(vkQueueSubmit(queue->queue, 1, &submitInfo, VK_NULL_HANDLE));
 }
-VkEvent vkh_event_create (VkhDevice dev) {
+VkEvent vkh_event_create (VkhDevice vkh) {
 	VkEvent evt;
 	VkEventCreateInfo evtInfo = {.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO};
-	VK_CHECK_RESULT(vkCreateEvent (dev->dev, &evtInfo, NULL, &evt));
+	VK_CHECK_RESULT(vkCreateEvent (vkh->dev, &evtInfo, NULL, &evt));
 	return evt;
 }
-VkCommandPool vkh_cmd_pool_create (VkhDevice dev, uint32_t qFamIndex, VkCommandPoolCreateFlags flags){
+VkCommandPool vkh_cmd_pool_create (VkhDevice vkh, uint32_t qFamIndex, VkCommandPoolCreateFlags flags){
 	VkCommandPool cmdPool;
 	VkCommandPoolCreateInfo cmd_pool_info = { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 											  .pNext = NULL,
 											  .queueFamilyIndex = qFamIndex,
 											  .flags = flags };
-	VK_CHECK_RESULT (vkCreateCommandPool(dev->dev, &cmd_pool_info, NULL, &cmdPool));
+	VK_CHECK_RESULT (vkCreateCommandPool(vkh->dev, &cmd_pool_info, NULL, &cmdPool));
 	return cmdPool;
 }
-VkCommandBuffer vkh_cmd_buff_create (VkhDevice dev, VkCommandPool cmdPool, VkCommandBufferLevel level){
+VkCommandBuffer vkh_cmd_buff_create (VkhDevice vkh, VkCommandPool cmdPool, VkCommandBufferLevel level){
 	VkCommandBuffer cmdBuff;
 	VkCommandBufferAllocateInfo cmd = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 										.pNext = NULL,
 										.commandPool = cmdPool,
 										.level = level,
 										.commandBufferCount = 1 };
-	VK_CHECK_RESULT (vkAllocateCommandBuffers (dev->dev, &cmd, &cmdBuff));
+	VK_CHECK_RESULT (vkAllocateCommandBuffers (vkh->dev, &cmd, &cmdBuff));
 	return cmdBuff;
 }
-void vkh_cmd_buffs_create (VkhDevice dev, VkCommandPool cmdPool, VkCommandBufferLevel level, uint32_t count, VkCommandBuffer* cmdBuffs){
+void vkh_cmd_buffs_create (VkhDevice vkh, VkCommandPool cmdPool, VkCommandBufferLevel level, uint32_t count, VkCommandBuffer* cmdBuffs){
 	VkCommandBufferAllocateInfo cmd = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 										.pNext = NULL,
 										.commandPool = cmdPool,
 										.level = level,
 										.commandBufferCount = count };
-	VK_CHECK_RESULT (vkAllocateCommandBuffers (dev->dev, &cmd, cmdBuffs));
+	VK_CHECK_RESULT (vkAllocateCommandBuffers (vkh->dev, &cmd, cmdBuffs));
 }
 void vkh_cmd_begin(VkCommandBuffer cmdBuff, VkCommandBufferUsageFlags flags) {
 	VkCommandBufferBeginInfo cmd_buf_info = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,

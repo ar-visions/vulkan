@@ -28,7 +28,7 @@ typedef struct _vkh_presenter_t {
 	VkQueue			queue;
 	VkCommandPool	cmdPool;
 	uint32_t		qFam;
-	VkhDevice		dev;
+	VkhDevice		vkh_device; /// these names must be unique.. too many dev's; just vkh is fine too.  vkg/vkvg is fine too
 
 	VkSurfaceKHR	surface;
 

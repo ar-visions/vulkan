@@ -30,10 +30,10 @@ VkhQueue _init_queue (VkhDevice dev) {
 }
 
 
-VkhQueue vkh_queue_create (VkhDevice dev, uint32_t familyIndex, uint32_t qIndex) {
+VkhQueue vkh_queue_create (VkhDevice vkh, uint32_t familyIndex, uint32_t qIndex) {
 	VkhQueue q	= _init_queue (dev);
 	q->familyIndex	= familyIndex;
-	vkGetDeviceQueue (dev->dev, familyIndex, qIndex, &q->queue);
+	vkGetDeviceQueue (vkh->device, familyIndex, qIndex, &q->queue);
 	return q;
 }
 

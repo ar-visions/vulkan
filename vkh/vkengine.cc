@@ -175,7 +175,8 @@ static VkEngine singleton;
 
 VkEngine vkengine_create (
 	uint32_t version_major, uint32_t version_minor, const char* app_name,
-	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, uint32_t width, uint32_t height, int dpi_index)
+	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, VkSampleCountFlagBits max_samples,
+	uint32_t width, uint32_t height, int dpi_index)
 {
 	if (singleton)
 		return singleton;
@@ -192,17 +193,17 @@ VkEngine vkengine_create (
 		exit(-1);
 	}
 
-	uint32_t phyCount = 0;
-
-	VkEngine e   = (VkEngine)calloc(1, sizeof(vk_engine_t));
-	e->vk_gpu    = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)e);
-	e->vk_device = ion::Device::create(e->vk_gpu);
-	e->refs      = 1;
-	e->inst      = e->vk_gpu->instance;
-	e->window 	 = e->vk_gpu->window;
-	e->pi 	     = vkh_phyinfo_create(e->vk_gpu->phys, e->vk_gpu->surface);
-	e->memory_properties = e->pi->memProps;
-	e->gpu_props = e->pi->properties;
+	VkEngine e     = (VkEngine)calloc(1, sizeof(vk_engine_t));
+	e->vk_gpu      = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)e);
+	e->vk_device   = ion::Device::create(e->vk_gpu); /// extensions should be application defined; they are loaded only when available anyway. we dont NEED anything more complex
+	e->max_samples = max_samples;
+	e->refs        = 1;
+	e->inst        = e->vk_gpu->instance;
+	e->window 	   = e->vk_gpu->window;
+	e->pi 	       = vkh_phyinfo_create(e->vk_gpu->phys, e->vk_gpu->surface);
+	e->memory_properties = e->pi->memProps; // redundant
+	e->gpu_props   = e->pi->properties;
+	e->refs        = 1;
 
 	uint32_t qCount = 0;
 	float qPriorities[] = {0.0};
@@ -215,16 +216,15 @@ VkEngine vkengine_create (
 	if (vkh_phyinfo_create_transfer_queues		(e->pi, 1, qPriorities, &pQueueInfos[qCount]))
 		qCount++;*/
 
-
 	/// copy from vk
 	e->pi->supportedFeatures = e->vk_gpu->support;
 
 	/// this was vkh_device_create; importing from vk now; the extensions should match
-	e->dev = vkh_device_import (e, e->vk_gpu->phys, e->vk_device->device);
+	e->vkh = vkh_device_import(e);
 
 	/// create presenter associated to engine/window
 	e->renderer = vkh_presenter_create(
-		e->dev,
+		e->vkh,
 		(uint32_t) e->pi->pQueue, e->vk_gpu->surface,
 		width    * e->vk_gpu->dpi_scale.x,
 		height   * e->vk_gpu->dpi_scale.y,
@@ -242,10 +242,10 @@ VkEngine vkengine_grab (VkEngine e) {
 
 void vkengine_drop (VkEngine e) {
 	if (e && --e->refs == 0) {
-		//vkDeviceWaitIdle(e->dev->dev);
+		//vkDeviceWaitIdle(e->vkh->device);
 		VkSurfaceKHR surf = e->renderer->surface;
 		vkh_presenter_destroy(e->renderer);
-		vkh_device_destroy(e->dev);
+		vkh_device_drop(e->vkh);
 		e->vk_device.drop();
 		e->vk_gpu.drop();
 		free(e);
