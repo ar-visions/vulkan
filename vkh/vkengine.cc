@@ -176,7 +176,7 @@ static VkEngine singleton;
 VkEngine vkengine_create (
 	uint32_t version_major, uint32_t version_minor, const char* app_name,
 	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, VkSampleCountFlagBits max_samples,
-	uint32_t width, uint32_t height, int dpi_index)
+	uint32_t width, uint32_t height, int dpi_index, void *user_data)
 {
 	if (singleton)
 		return singleton;
@@ -195,7 +195,7 @@ VkEngine vkengine_create (
 
 	VkEngine e     = (VkEngine)calloc(1, sizeof(vk_engine_t));
 	e->refs        = 1;
-	e->vk_gpu      = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)e);
+	e->vk_gpu      = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)user_data);
 	e->vk_device   = ion::Device::create(e->vk_gpu); /// extensions should be application defined; they are loaded only when available anyway. we dont NEED anything more complex
 	e->max_samples = max_samples;
 	e->instance    = e->vk_gpu->instance;
@@ -219,15 +219,12 @@ VkEngine vkengine_create (
 	e->pi->supportedFeatures = e->vk_gpu->support;
 
 	/// this was vkh_device_create; importing from vk now; the extensions should match
-	e->vkh = vkh_device_import(e);
+	e->vkh = vkh_device_import(e); /// round-about device
 
 	/// create presenter associated to engine/window
 	e->renderer = vkh_presenter_create(
-		e->vkh,
-		(uint32_t) e->pi->pQueue, e->vk_gpu->surface,
-		width    * e->vk_gpu->dpi_scale.x,
-		height   * e->vk_gpu->dpi_scale.y,
-		VK_FORMAT_B8G8R8A8_UNORM, presentMode);
+		e->vkh, (uint32_t) e->pi->pQueue, e->vk_gpu->surface,
+		width, height, VK_FORMAT_B8G8R8A8_UNORM, presentMode);
 
 	singleton = e;
 	return e;

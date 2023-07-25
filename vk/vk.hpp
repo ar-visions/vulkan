@@ -92,8 +92,7 @@ struct GPU:mx {
         VkSurfaceKHR            surface     = 0;
         QueueFamilyIndices      indices;
         SwapChainSupportDetails details;
-        void*                   user_data;
-        ResizeFn                resize;
+        ResizeFn                resize; /// deprecate
         vec2i                   sz;
         VkPhysicalDeviceFeatures support;
         vec2f                   dpi_scale;

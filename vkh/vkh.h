@@ -239,7 +239,7 @@ void        vkh_presenter_build_blit_cmd    (VkhPresenter r, VkImage blitSource,
 vkh_public
 void        vkh_presenter_create_swapchain  (VkhPresenter r);
 vkh_public
-void		vkh_presenter_get_size			(VkhPresenter r, uint32_t* pWidth, uint32_t* pHeight);
+void		vkh_presenter_get_size			(VkhPresenter r, uint32_t* pWidth, uint32_t* pHeight, float *scale_x, float *scale_y);
 /************
  * VkhImage *
  ************/
@@ -273,9 +273,9 @@ void vkh_image_set_layout_subres(VkCommandBuffer cmdBuff, VkhImage image, VkImag
 vkh_public
 void vkh_image_destroy_sampler  (VkhImage img);
 vkh_public
-void vkh_image_destroy          (VkhImage img);
+void vkh_image_drop          (VkhImage img);
 vkh_public
-void vkh_image_reference		(VkhImage img);
+VkhImage vkh_image_grab     	(VkhImage img);
 vkh_public
 void* vkh_image_map             (VkhImage img);
 vkh_public

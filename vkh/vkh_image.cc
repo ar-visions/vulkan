@@ -72,7 +72,7 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 
 	return img;
 }
-void vkh_image_destroy(VkhImage img)
+void vkh_image_drop(VkhImage img)
 {
 	if (img==NULL)
 		return;
@@ -108,11 +108,14 @@ void vkh_image_destroy(VkhImage img)
 	free(img);
 	img = NULL;
 }
-void vkh_image_reference (VkhImage img) {
+
+VkhImage vkh_image_grab (VkhImage img) {
 	mtx_lock	(&img->mutex);
 	img->refs++;
 	mtx_unlock	(&img->mutex);
+	return img;
 }
+
 VkhImage vkh_tex2d_array_create (VkhDevice vkh,
 							 VkFormat format, uint32_t width, uint32_t height, uint32_t layers,
 							 VkhMemoryUsage memprops, VkImageUsageFlags usage){

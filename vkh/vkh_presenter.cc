@@ -37,14 +37,15 @@ void _init_phy_surface	(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKH
 
 VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, VkSurfaceKHR surface, uint32_t width, uint32_t height,
 						   VkFormat preferedFormat, VkPresentModeKHR presentMode) {
-	VkhPresenter r = (VkhPresenter)calloc(1,sizeof(vkh_presenter_t));
-
-	r->refs = 1;
-	r->vkh = vkh_device_grab(vkh);
-	r->qFam = presentQueueFamIdx ;
-	r->surface = surface;
-	r->width = width * vkh->e->vk_gpu->dpi_scale.x;
-	r->height = height * vkh->e->vk_gpu->dpi_scale.y;
+	VkhPresenter r 		= (VkhPresenter)calloc(1,sizeof(vkh_presenter_t));
+	r->refs 			= 1;
+	r->vkh 				= vkh_device_grab(vkh);
+	r->qFam 			= presentQueueFamIdx ;
+	r->surface 			= surface;
+	r->scale_x			= vkh->e->vk_gpu->dpi_scale.x;
+	r->scale_y			= vkh->e->vk_gpu->dpi_scale.y;
+	r->width 			= width  * r->scale_x;
+	r->height 			= height * r->scale_y;
 	vkGetDeviceQueue(r->vkh->device, r->qFam, 0, &r->queue);
 
 	r->cmdPool			= vkh_cmd_pool_create  (r->vkh, presentQueueFamIdx, 0);
@@ -53,9 +54,7 @@ VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, V
 	r->fenceDraw		= vkh_fence_create_signaled(r->vkh);
 
 	_init_phy_surface (r, preferedFormat, presentMode);
-
 	vkh_presenter_create_swapchain (r);
-
 	return r;
 }
 
@@ -90,7 +89,7 @@ bool vkh_presenter_acquireNextImage (VkhPresenter r, VkFence fence, VkSemaphore 
 
 
 bool vkh_presenter_draw (VkhPresenter r) {
-	if (!vkh_presenter_acquireNextImage (r, VK_NULL_HANDLE, r->semaPresentEnd)){
+	if (!vkh_presenter_acquireNextImage (r, VK_NULL_HANDLE, r->semaPresentEnd)) {
 		vkh_presenter_create_swapchain (r);
 		return false;
 	}
@@ -135,7 +134,7 @@ void vkh_presenter_build_blit_cmd (VkhPresenter r, VkImage blitSource, uint32_t 
 		VkImage bltDstImage = r->ScBuffers[i]->image;
 		VkCommandBuffer cb = r->cmdBuffs[i];
 
-		vkh_cmd_begin(cb,0);
+		vkh_cmd_begin(cb,0); /// we need to control this outside this function i think
 
 		set_image_layout(cb, bltDstImage, VK_IMAGE_ASPECT_COLOR_BIT,
 				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -173,9 +172,11 @@ void vkh_presenter_build_blit_cmd (VkhPresenter r, VkImage blitSource, uint32_t 
 		vkh_cmd_end(cb);
 	}
 }
-void vkh_presenter_get_size (VkhPresenter r, uint32_t* pWidth, uint32_t* pHeight){
-	*pWidth = r->width;
+void vkh_presenter_get_size (VkhPresenter r, uint32_t* pWidth, uint32_t* pHeight, float *scale_x, float *scale_y){
+	*pWidth  = r->width;
 	*pHeight = r->height;
+	if (scale_x) *scale_x = r->scale_x;
+	if (scale_y) *scale_y = r->scale_y;
 }
 void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR presentMode){
 	uint32_t count;
@@ -281,7 +282,7 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 void _swapchain_destroy (VkhPresenter r){
 	for (uint32_t i = 0; i < r->imgCount; i++)
 	{
-		vkh_image_destroy (r->ScBuffers [i]);
+		vkh_image_drop (r->ScBuffers [i]);
 		vkFreeCommandBuffers (r->vkh->device, r->cmdPool, 1, &r->cmdBuffs[i]);
 	}
 	vkDestroySwapchainKHR (r->vkh->device, r->swapChain, NULL);

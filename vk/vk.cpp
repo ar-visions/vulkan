@@ -293,9 +293,10 @@ bool GPU::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFam
 }
 
 void GPU::impl::framebuffer_resized(GLFWwindow* window, int width, int height) {
-    GPU::impl *g = (GPU::impl*)(glfwGetWindowUserPointer(window));
-    g->sz = vec2i { width, height };
-    g->resize(g->sz, g->user_data);
+    /// i think acquire next image works with surface
+    //GPU::impl *g = (GPU::impl*)(glfwGetWindowUserPointer(window));
+    //g->sz = vec2i { width, height };
+    //g->resize(g->sz, g->user_data);
 }
 
 /// select gpu, initialize vulkan, create window and register user
@@ -359,10 +360,9 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
 
     vkGetPhysicalDeviceFeatures(g->phys, &g->support);
 
-    /// we must fully isolate glfw here
-    g->user_data = user_data;
-    glfwSetWindowUserPointer(g->window, g.data);
-    glfwSetFramebufferSizeCallback(g->window, impl::framebuffer_resized);
+    /// we should fully isolate glfw in vk
+    glfwSetWindowUserPointer(g->window, user_data);
+    //glfwSetFramebufferSizeCallback(g->window, impl::framebuffer_resized); -- user data not layered here and will be handled in ux
     glfwShowWindow(g->window);
     return g;
 }

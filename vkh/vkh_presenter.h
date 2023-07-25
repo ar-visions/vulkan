@@ -40,8 +40,8 @@ typedef struct _vkh_presenter_t {
 	VkFormat		format;
 	VkColorSpaceKHR colorSpace;
 	VkPresentModeKHR presentMode;
-	uint32_t		width;
-	uint32_t		height;
+	uint32_t		width, height;
+	float			scale_x, scale_y;
 
 	uint32_t		imgCount;
 	uint32_t		currentScBufferIndex;

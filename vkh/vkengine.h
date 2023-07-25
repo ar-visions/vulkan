@@ -85,7 +85,7 @@ typedef void (*GLFWcharfun)(struct GLFWwindow*, unsigned int);
 vk_engine_t*   vkengine_create(
 	uint32_t version_major, uint32_t version_minor, const char* app_name,
 	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, VkSampleCountFlagBits max_samples, /// max_samples is a soft max for users of the app; it must also be checked against the hardware sample max
-	uint32_t width, uint32_t height, int dpi_index);
+	uint32_t width, uint32_t height, int dpi_index, void *user_data);
 
 void 				vkengine_dump_available_layers   	();
 bool 				vkengine_try_get_phyinfo 			(VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy);
