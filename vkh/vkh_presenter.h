@@ -25,6 +25,7 @@
 #include <vkh/vkh.h>
 
 typedef struct _vkh_presenter_t {
+	size_t			refs;
 	VkQueue			queue;
 	VkCommandPool	cmdPool;
 	uint32_t		qFam;

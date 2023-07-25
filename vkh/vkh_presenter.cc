@@ -39,11 +39,12 @@ VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, V
 						   VkFormat preferedFormat, VkPresentModeKHR presentMode) {
 	VkhPresenter r = (VkhPresenter)calloc(1,sizeof(vkh_presenter_t));
 
-	r->vkh = vkh;
+	r->refs = 1;
+	r->vkh = vkh_device_grab(vkh);
 	r->qFam = presentQueueFamIdx ;
 	r->surface = surface;
-	r->width = width;
-	r->height = height;
+	r->width = width * vkh->e->vk_gpu->dpi_scale.x;
+	r->height = height * vkh->e->vk_gpu->dpi_scale.y;
 	vkGetDeviceQueue(r->vkh->device, r->qFam, 0, &r->queue);
 
 	r->cmdPool			= vkh_cmd_pool_create  (r->vkh, presentQueueFamIdx, 0);
@@ -58,17 +59,26 @@ VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, V
 	return r;
 }
 
-void vkh_presenter_destroy (VkhPresenter r) {
-	vkDeviceWaitIdle (r->vkh->device);
+VkhPresenter vkh_presenter_grab(VkhPresenter r) {
+	if (r)
+		r->refs++;
+	return r;
+}
 
-	_swapchain_destroy (r);
+void vkh_presenter_drop (VkhPresenter r) {
+	if (r && --r->refs == 0) {
+		vkDeviceWaitIdle (r->vkh->device);
 
-	vkDestroySemaphore	(r->vkh->device, r->semaDrawEnd, NULL);
-	vkDestroySemaphore	(r->vkh->device, r->semaPresentEnd, NULL);
-	vkDestroyFence		(r->vkh->device, r->fenceDraw, NULL);
-	vkDestroyCommandPool(r->vkh->device, r->cmdPool, NULL);
+		_swapchain_destroy (r);
 
-	free (r);
+		vkh_device_drop(r->vkh);
+		vkDestroySemaphore	(r->vkh->device, r->semaDrawEnd, NULL);
+		vkDestroySemaphore	(r->vkh->device, r->semaPresentEnd, NULL);
+		vkDestroyFence		(r->vkh->device, r->fenceDraw, NULL);
+		vkDestroyCommandPool(r->vkh->device, r->cmdPool, NULL);
+
+		free (r);
+	}
 }
 
 bool vkh_presenter_acquireNextImage (VkhPresenter r, VkFence fence, VkSemaphore semaphore) {
@@ -115,7 +125,10 @@ bool vkh_presenter_draw (VkhPresenter r) {
 
 void vkh_presenter_build_blit_cmd (VkhPresenter r, VkImage blitSource, uint32_t width, uint32_t height){
 
-	uint32_t w = MIN(width, r->width), h = MIN(height, r->height);
+	uint32_t dst_w = width  * r->vkh->e->vk_gpu->dpi_scale.x;
+	uint32_t dst_h = height * r->vkh->e->vk_gpu->dpi_scale.y;
+	uint32_t src_w = MIN(dst_w, r->width), /// surface & presenter have the scale applied; the user does not apply the scale to args
+			 src_h = MIN(dst_h, r->height);
 
 	for (uint32_t i = 0; i < r->imgCount; ++i)
 	{
@@ -139,10 +152,10 @@ void vkh_presenter_build_blit_cmd (VkhPresenter r, VkImage blitSource, uint32_t 
 								.extent = {MIN(w,r->width), MIN(h,r->height),1}};*/
 		VkImageBlit bregion = { .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
 								.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-								.srcOffsets[0] = {0},
-								.srcOffsets[1] = {w, h, 1},
-								.dstOffsets[0] = {0},
-								.dstOffsets[1] = {width, height, 1}
+								.srcOffsets[0] = { 0 },
+								.srcOffsets[1] = { src_w, src_h, 1 },
+								.dstOffsets[0] = { 0 },
+								.dstOffsets[1] = { dst_w, dst_h, 1 }
 							  };
 
 		vkCmdBlitImage(cb, blitSource, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bltDstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bregion, VK_FILTER_NEAREST);

@@ -25,7 +25,7 @@
 
 VkhQueue _init_queue (VkhDevice vkh) {
 	VkhQueue q	= (vkh_queue_t*)calloc(1, sizeof(vkh_queue_t));
-	q->vkh = vkh;
+	q->vkh = vkh_device_grab(vkh);
 	return q;
 }
 
@@ -43,5 +43,6 @@ VkhQueue vkh_queue_create (VkhDevice vkh, uint32_t familyIndex, uint32_t qIndex)
 //}
 
 void vkh_queue_destroy (VkhQueue queue){
+	vkh_device_drop(queue->vkh);
 	free (queue);
 }

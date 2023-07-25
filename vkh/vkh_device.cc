@@ -116,6 +116,7 @@ VkhDevice vkh_device_grab(VkhDevice vkh) {
 
 VkhDevice vkh_device_import (VkEngine e) {
 	VkhDevice vkh = (vkh_device_t*)calloc(1,sizeof(vkh_device_t));
+	vkh->refs = 1;
 	vkh->device = e->vk_device->device;
 	vkh->e = e;
 

@@ -225,8 +225,11 @@ vkh_public
 VkhPresenter vkh_presenter_create (VkhDevice dev, uint32_t presentQueueFamIdx, VkSurfaceKHR surface,
                                                                    uint32_t width, uint32_t height,
                                                                    VkFormat preferedFormat, VkPresentModeKHR presentMode);
+
+vkh_public VkhPresenter vkh_presenter_grab(VkhPresenter r);
+
 vkh_public
-void        vkh_presenter_destroy (VkhPresenter r);
+void        vkh_presenter_drop (VkhPresenter r);
 vkh_public
 bool        vkh_presenter_draw    (VkhPresenter r);
 vkh_public

@@ -30,7 +30,7 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 
 	VkhImage img = (VkhImage)calloc(1,sizeof(vkh_image_t));
 
-	img->vkh = vkh;
+	img->vkh = vkh_device_grab(vkh);
 
 	VkImageCreateInfo* pInfo = &img->infos;
 	pInfo->sType			= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -86,6 +86,8 @@ void vkh_image_destroy(VkhImage img)
 
 	mtx_unlock (&img->mutex);
 	mtx_destroy (&img->mutex);
+
+	vkh_device_drop(img->vkh);
 
 	if(img->view != VK_NULL_HANDLE)
 		vkDestroyImageView (img->vkh->device,img->view, NULL);

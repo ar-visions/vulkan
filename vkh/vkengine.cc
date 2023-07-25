@@ -194,16 +194,15 @@ VkEngine vkengine_create (
 	}
 
 	VkEngine e     = (VkEngine)calloc(1, sizeof(vk_engine_t));
+	e->refs        = 1;
 	e->vk_gpu      = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)e);
 	e->vk_device   = ion::Device::create(e->vk_gpu); /// extensions should be application defined; they are loaded only when available anyway. we dont NEED anything more complex
 	e->max_samples = max_samples;
-	e->refs        = 1;
 	e->instance    = e->vk_gpu->instance;
 	e->window 	   = e->vk_gpu->window;
 	e->pi 	       = vkh_phyinfo_create(e->vk_gpu->phys, e->vk_gpu->surface);
 	e->memory_properties = e->pi->memProps; // redundant
 	e->gpu_props   = e->pi->properties;
-	e->refs        = 1;
 
 	uint32_t qCount = 0;
 	float qPriorities[] = {0.0};
@@ -244,7 +243,7 @@ void vkengine_drop (VkEngine e) {
 	if (e && --e->refs == 0) {
 		//vkDeviceWaitIdle(e->vkh->device);
 		VkSurfaceKHR surf = e->renderer->surface;
-		vkh_presenter_destroy(e->renderer);
+		vkh_presenter_drop(e->renderer);
 		vkh_device_drop(e->vkh);
 		e->vk_device.drop();
 		e->vk_gpu.drop();

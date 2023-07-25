@@ -41,7 +41,8 @@ void _set_size_and_bind(VkhDevice vkh, VkBufferUsageFlags usage, VkhMemoryUsage 
 #endif
 
 void vkh_buffer_init(VkhDevice vkh, VkBufferUsageFlags usage, VkhMemoryUsage memprops, VkDeviceSize size, VkhBuffer buff, bool mapped){
-	buff->vkh = vkh;
+	buff->vkh = vkh_device_grab(vkh);
+	
 	VkBufferCreateInfo* pInfo = &buff->infos;
 	pInfo->sType		= VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	pInfo->usage		= usage;
