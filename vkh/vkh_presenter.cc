@@ -67,15 +67,14 @@ VkhPresenter vkh_presenter_grab(VkhPresenter r) {
 void vkh_presenter_drop (VkhPresenter r) {
 	if (r && --r->refs == 0) {
 		vkDeviceWaitIdle (r->vkh->device);
-
-		_swapchain_destroy (r);
-
-		vkh_device_drop(r->vkh);
 		vkDestroySemaphore	(r->vkh->device, r->semaDrawEnd, NULL);
 		vkDestroySemaphore	(r->vkh->device, r->semaPresentEnd, NULL);
 		vkDestroyFence		(r->vkh->device, r->fenceDraw, NULL);
-		vkDestroyCommandPool(r->vkh->device, r->cmdPool, NULL);
+		
+		_swapchain_destroy  (r);
 
+		vkDestroyCommandPool(r->vkh->device, r->cmdPool, NULL);
+		vkh_device_drop		(r->vkh);
 		free (r);
 	}
 }
@@ -280,10 +279,9 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 	free (images);
 }
 void _swapchain_destroy (VkhPresenter r){
-	for (uint32_t i = 0; i < r->imgCount; i++)
-	{
-		vkh_image_drop (r->ScBuffers [i]);
+	for (uint32_t i = 0; i < r->imgCount; i++) {
 		vkFreeCommandBuffers (r->vkh->device, r->cmdPool, 1, &r->cmdBuffs[i]);
+		vkh_image_drop (r->ScBuffers [i]);
 	}
 	vkDestroySwapchainKHR (r->vkh->device, r->swapChain, NULL);
 	r->swapChain = VK_NULL_HANDLE;

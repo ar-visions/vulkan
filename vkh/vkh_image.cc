@@ -133,7 +133,7 @@ VkhImage vkh_image_create (VkhDevice vkh,
 //create vkhImage from existing VkImage
 VkhImage vkh_image_import (VkhDevice vkh, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height) {
 	VkhImage img = (VkhImage)calloc(1,sizeof(vkh_image_t));
-	img->vkh		= vkh;
+	img->vkh		= vkh_device_grab(vkh);
 	img->image		= vkImg;
 	img->imported	= true;
 

@@ -238,7 +238,7 @@ VkEngine vkengine_grab (VkEngine e) {
 
 void vkengine_drop (VkEngine e) {
 	if (e && --e->refs == 0) {
-		//vkDeviceWaitIdle(e->vkh->device);
+		vkDeviceWaitIdle(e->vkh->device);
 		VkSurfaceKHR surf = e->renderer->surface;
 		vkh_presenter_drop(e->renderer);
 		vkh_device_drop(e->vkh);
