@@ -111,7 +111,7 @@ const void* vkh_get_device_requirements (VkPhysicalDevice phy, VkPhysicalDeviceF
 VkhDevice vkh_device_grab(VkhDevice vkh) {
 	if (vkh)
 		vkh->refs++;
-	return dev;
+	return vkh;
 }
 
 VkhDevice vkh_device_import (VkEngine e) {
@@ -148,12 +148,12 @@ VkEngine vkh_device_get_engine (VkhDevice vkh) {
  * @param vkh device
  */
 void vkh_device_init_debug_utils (VkhDevice vkh) {
-	SetDebugUtilsObjectNameEXT		= (PFN_vkSetDebugUtilsObjectNameEXT)	vkGetInstanceProcAddr(vkh->e->inst, "vkSetDebugUtilsObjectNameEXT");
-	QueueBeginDebugUtilsLabelEXT	= (PFN_vkQueueBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->inst, "vkQueueBeginDebugUtilsLabelEXT");
-	QueueEndDebugUtilsLabelEXT		= (PFN_vkQueueEndDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->inst, "vkQueueEndDebugUtilsLabelEXT");
-	CmdBeginDebugUtilsLabelEXT		= (PFN_vkCmdBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->inst, "vkCmdBeginDebugUtilsLabelEXT");
-	CmdEndDebugUtilsLabelEXT		= (PFN_vkCmdEndDebugUtilsLabelEXT)		vkGetInstanceProcAddr(vkh->e->inst, "vkCmdEndDebugUtilsLabelEXT");
-	CmdInsertDebugUtilsLabelEXT		= (PFN_vkCmdInsertDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->inst, "vkCmdInsertDebugUtilsLabelEXT");
+	SetDebugUtilsObjectNameEXT		= (PFN_vkSetDebugUtilsObjectNameEXT)	vkGetInstanceProcAddr(vkh->e->instance, "vkSetDebugUtilsObjectNameEXT");
+	QueueBeginDebugUtilsLabelEXT	= (PFN_vkQueueBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->instance, "vkQueueBeginDebugUtilsLabelEXT");
+	QueueEndDebugUtilsLabelEXT		= (PFN_vkQueueEndDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->instance, "vkQueueEndDebugUtilsLabelEXT");
+	CmdBeginDebugUtilsLabelEXT		= (PFN_vkCmdBeginDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->instance, "vkCmdBeginDebugUtilsLabelEXT");
+	CmdEndDebugUtilsLabelEXT		= (PFN_vkCmdEndDebugUtilsLabelEXT)		vkGetInstanceProcAddr(vkh->e->instance, "vkCmdEndDebugUtilsLabelEXT");
+	CmdInsertDebugUtilsLabelEXT		= (PFN_vkCmdInsertDebugUtilsLabelEXT)	vkGetInstanceProcAddr(vkh->e->instance, "vkCmdInsertDebugUtilsLabelEXT");
 }
 VkSampler vkh_device_create_sampler (VkhDevice vkh, VkFilter magFilter, VkFilter minFilter,
 							   VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode){

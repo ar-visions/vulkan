@@ -23,15 +23,15 @@
 #include <vkh/vkh_device.h>
 #include <vkh/vkh_phyinfo.h>
 
-VkhQueue _init_queue (VkhDevice dev) {
+VkhQueue _init_queue (VkhDevice vkh) {
 	VkhQueue q	= (vkh_queue_t*)calloc(1, sizeof(vkh_queue_t));
-	q->dev = dev;
+	q->vkh = vkh;
 	return q;
 }
 
 
 VkhQueue vkh_queue_create (VkhDevice vkh, uint32_t familyIndex, uint32_t qIndex) {
-	VkhQueue q	= _init_queue (dev);
+	VkhQueue q	= _init_queue (vkh);
 	q->familyIndex	= familyIndex;
 	vkGetDeviceQueue (vkh->device, familyIndex, qIndex, &q->queue);
 	return q;

@@ -59,7 +59,7 @@ VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, V
 }
 
 void vkh_presenter_destroy (VkhPresenter r) {
-	vkDeviceWaitIdle (r->vkh->dev);
+	vkDeviceWaitIdle (r->vkh->device);
 
 	_swapchain_destroy (r);
 
@@ -74,7 +74,7 @@ void vkh_presenter_destroy (VkhPresenter r) {
 bool vkh_presenter_acquireNextImage (VkhPresenter r, VkFence fence, VkSemaphore semaphore) {
 	// Get the index of the next available swapchain image:
 	VkResult err = vkAcquireNextImageKHR
-			(r->vkh->dev, r->swapChain, UINT64_MAX, semaphore, fence, &r->currentScBufferIndex);
+			(r->vkh->device, r->swapChain, UINT64_MAX, semaphore, fence, &r->currentScBufferIndex);
 	return ((err != VK_ERROR_OUT_OF_DATE_KHR) && (err != VK_SUBOPTIMAL_KHR));
 }
 
@@ -200,7 +200,7 @@ void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR
 
 void vkh_presenter_create_swapchain (VkhPresenter r){
 	// Ensure all operations on the device have been finished before destroying resources
-	vkDeviceWaitIdle(r->vkh->dev);
+	vkDeviceWaitIdle(r->vkh->device);
 
 	VkSurfaceCapabilitiesKHR surfCapabilities;
 	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(r->vkh->e->vk_gpu->phys, r->surface, &surfCapabilities));
@@ -240,27 +240,27 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 											.clipped = VK_TRUE,
 											.oldSwapchain = r->swapChain};
 
-	VK_CHECK_RESULT(vkCreateSwapchainKHR (r->vkh->dev, &createInfo, NULL, &newSwapchain));
+	VK_CHECK_RESULT(vkCreateSwapchainKHR (r->vkh->device, &createInfo, NULL, &newSwapchain));
 	if (r->swapChain != VK_NULL_HANDLE)
 		_swapchain_destroy(r);
 	r->swapChain = newSwapchain;
 
-	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->vkh->dev, r->swapChain, &r->imgCount, NULL));
+	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->vkh->device, r->swapChain, &r->imgCount, NULL));
 	assert (r->imgCount>0);
 
 	VkImage* images = (VkImage*)malloc(r->imgCount * sizeof(VkImage));
-	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->vkh->dev, r->swapChain, &r->imgCount, images));
+	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->vkh->device, r->swapChain, &r->imgCount, images));
 
 	r->ScBuffers = (VkhImage*)		malloc (r->imgCount * sizeof(VkhImage));
 	r->cmdBuffs = (VkCommandBuffer*)malloc (r->imgCount * sizeof(VkCommandBuffer));
 
 	for (uint32_t i=0; i<r->imgCount; i++) {
 
-		VkhImage sci = vkh_image_import(r->dev, images[i], r->format, r->width, r->height);
+		VkhImage sci = vkh_image_import(r->vkh, images[i], r->format, r->width, r->height);
 		vkh_image_create_view(sci, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT);
 		r->ScBuffers [i] = sci;
 
-		r->cmdBuffs [i] = vkh_cmd_buff_create(r->dev, r->cmdPool,VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+		r->cmdBuffs [i] = vkh_cmd_buff_create(r->vkh, r->cmdPool,VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 	}
 	r->currentScBufferIndex = 0;
 	free (images);
@@ -269,9 +269,9 @@ void _swapchain_destroy (VkhPresenter r){
 	for (uint32_t i = 0; i < r->imgCount; i++)
 	{
 		vkh_image_destroy (r->ScBuffers [i]);
-		vkFreeCommandBuffers (r->vkh->dev, r->cmdPool, 1, &r->cmdBuffs[i]);
+		vkFreeCommandBuffers (r->vkh->device, r->cmdPool, 1, &r->cmdBuffs[i]);
 	}
-	vkDestroySwapchainKHR (r->vkh->dev, r->swapChain, NULL);
+	vkDestroySwapchainKHR (r->vkh->device, r->swapChain, NULL);
 	r->swapChain = VK_NULL_HANDLE;
 	free(r->ScBuffers);
 	free(r->cmdBuffs);

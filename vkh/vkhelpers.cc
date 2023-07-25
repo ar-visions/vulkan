@@ -29,7 +29,7 @@ VkFence vkh_fence_create (VkhDevice vkh) {
 	VkFenceCreateInfo fenceInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 									.pNext = NULL,
 									.flags = 0 };
-	VK_CHECK_RESULT(vkCreateFence(vkh->dev, &fenceInfo, NULL, &fence));
+	VK_CHECK_RESULT(vkCreateFence(vkh->device, &fenceInfo, NULL, &fence));
 	return fence;
 }
 VkFence vkh_fence_create_signaled (VkhDevice vkh) {
@@ -37,7 +37,7 @@ VkFence vkh_fence_create_signaled (VkhDevice vkh) {
 	VkFenceCreateInfo fenceInfo = { .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
 									.pNext = NULL,
 									.flags = VK_FENCE_CREATE_SIGNALED_BIT };
-	VK_CHECK_RESULT(vkCreateFence(vkh->dev, &fenceInfo, NULL, &fence));
+	VK_CHECK_RESULT(vkCreateFence(vkh->device, &fenceInfo, NULL, &fence));
 	return fence;
 }
 VkSemaphore vkh_semaphore_create (VkhDevice vkh) {
@@ -45,7 +45,7 @@ VkSemaphore vkh_semaphore_create (VkhDevice vkh) {
 	VkSemaphoreCreateInfo info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 								   .pNext = NULL,
 								   .flags = 0};
-	VK_CHECK_RESULT(vkCreateSemaphore(vkh->dev, &info, NULL, &semaphore));
+	VK_CHECK_RESULT(vkCreateSemaphore(vkh->device, &info, NULL, &semaphore));
 	return semaphore;
 }
 VkSemaphore vkh_timeline_create (VkhDevice vkh, uint64_t initialValue) {
@@ -57,7 +57,7 @@ VkSemaphore vkh_timeline_create (VkhDevice vkh, uint64_t initialValue) {
 	VkSemaphoreCreateInfo info = { .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
 								   .pNext = &timelineInfo,
 								   .flags = 0};
-	VK_CHECK_RESULT(vkCreateSemaphore(vkh->dev, &info, NULL, &semaphore));
+	VK_CHECK_RESULT(vkCreateSemaphore(vkh->device, &info, NULL, &semaphore));
 	return semaphore;
 }
 
@@ -70,7 +70,7 @@ VkResult vkh_timeline_wait (VkhDevice vkh, VkSemaphore timeline, const uint64_t 
 	waitInfo.pSemaphores	= &timeline;
 	waitInfo.pValues		= &wait;
 
-	return vkWaitSemaphores(vkh->dev, &waitInfo, UINT64_MAX);
+	return vkWaitSemaphores(vkh->device, &waitInfo, UINT64_MAX);
 }
 void vkh_cmd_submit_timelined (VkhQueue queue, VkCommandBuffer *pCmdBuff, VkSemaphore timeline, const uint64_t wait, const uint64_t signal) {
 	static VkPipelineStageFlags stageFlags = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
@@ -121,7 +121,7 @@ void vkh_cmd_submit_timelined2 (VkhQueue queue, VkCommandBuffer *pCmdBuff, VkSem
 VkEvent vkh_event_create (VkhDevice vkh) {
 	VkEvent evt;
 	VkEventCreateInfo evtInfo = {.sType = VK_STRUCTURE_TYPE_EVENT_CREATE_INFO};
-	VK_CHECK_RESULT(vkCreateEvent (vkh->dev, &evtInfo, NULL, &evt));
+	VK_CHECK_RESULT(vkCreateEvent (vkh->device, &evtInfo, NULL, &evt));
 	return evt;
 }
 VkCommandPool vkh_cmd_pool_create (VkhDevice vkh, uint32_t qFamIndex, VkCommandPoolCreateFlags flags){
@@ -130,7 +130,7 @@ VkCommandPool vkh_cmd_pool_create (VkhDevice vkh, uint32_t qFamIndex, VkCommandP
 											  .pNext = NULL,
 											  .queueFamilyIndex = qFamIndex,
 											  .flags = flags };
-	VK_CHECK_RESULT (vkCreateCommandPool(vkh->dev, &cmd_pool_info, NULL, &cmdPool));
+	VK_CHECK_RESULT (vkCreateCommandPool(vkh->device, &cmd_pool_info, NULL, &cmdPool));
 	return cmdPool;
 }
 VkCommandBuffer vkh_cmd_buff_create (VkhDevice vkh, VkCommandPool cmdPool, VkCommandBufferLevel level){
@@ -140,7 +140,7 @@ VkCommandBuffer vkh_cmd_buff_create (VkhDevice vkh, VkCommandPool cmdPool, VkCom
 										.commandPool = cmdPool,
 										.level = level,
 										.commandBufferCount = 1 };
-	VK_CHECK_RESULT (vkAllocateCommandBuffers (vkh->dev, &cmd, &cmdBuff));
+	VK_CHECK_RESULT (vkAllocateCommandBuffers (vkh->device, &cmd, &cmdBuff));
 	return cmdBuff;
 }
 void vkh_cmd_buffs_create (VkhDevice vkh, VkCommandPool cmdPool, VkCommandBufferLevel level, uint32_t count, VkCommandBuffer* cmdBuffs){
@@ -149,7 +149,7 @@ void vkh_cmd_buffs_create (VkhDevice vkh, VkCommandPool cmdPool, VkCommandBuffer
 										.commandPool = cmdPool,
 										.level = level,
 										.commandBufferCount = count };
-	VK_CHECK_RESULT (vkAllocateCommandBuffers (vkh->dev, &cmd, cmdBuffs));
+	VK_CHECK_RESULT (vkAllocateCommandBuffers (vkh->device, &cmd, cmdBuffs));
 }
 void vkh_cmd_begin(VkCommandBuffer cmdBuff, VkCommandBufferUsageFlags flags) {
 	VkCommandBufferBeginInfo cmd_buf_info = { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,

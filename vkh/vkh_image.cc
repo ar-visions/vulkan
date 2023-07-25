@@ -88,16 +88,16 @@ void vkh_image_destroy(VkhImage img)
 	mtx_destroy (&img->mutex);
 
 	if(img->view != VK_NULL_HANDLE)
-		vkDestroyImageView (img->vkh->dev,img->view, NULL);
+		vkDestroyImageView (img->vkh->device,img->view, NULL);
 	if(img->sampler != VK_NULL_HANDLE)
-		vkDestroySampler (img->vkh->dev,img->sampler, NULL);
+		vkDestroySampler (img->vkh->device,img->sampler, NULL);
 
 	if (!img->imported) {
 #ifdef VKH_USE_VMA
 		vmaDestroyImage	(img->vkh->allocator, img->image, img->alloc);
 #else
-		vkDestroyImage	(img->vkh->dev, img->image, NULL);
-		vkFreeMemory	(img->vkh->dev, img->memory, NULL);
+		vkDestroyImage	(img->vkh->device, img->image, NULL);
+		vkFreeMemory	(img->vkh->device, img->memory, NULL);
 
 #endif
 	}
@@ -156,7 +156,7 @@ VkhImage vkh_image_ms_create(VkhDevice vkh,
 }
 void vkh_image_create_view (VkhImage img, VkImageViewType viewType, VkImageAspectFlags aspectFlags){
 	if(img->view != VK_NULL_HANDLE)
-		vkDestroyImageView	(img->vkh->dev,img->view,NULL);
+		vkDestroyImageView	(img->vkh->device,img->view,NULL);
 
 	VkImageViewCreateInfo viewInfo = { .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 										 .image = img->image,
@@ -164,12 +164,12 @@ void vkh_image_create_view (VkhImage img, VkImageViewType viewType, VkImageAspec
 										 .format = img->infos.format,
 										 .components = {VK_COMPONENT_SWIZZLE_R,VK_COMPONENT_SWIZZLE_G,VK_COMPONENT_SWIZZLE_B,VK_COMPONENT_SWIZZLE_A},
 										 .subresourceRange = {aspectFlags,0,1,0,img->infos.arrayLayers}};
-	VK_CHECK_RESULT(vkCreateImageView(img->vkh->dev, &viewInfo, NULL, &img->view));
+	VK_CHECK_RESULT(vkCreateImageView(img->vkh->device, &viewInfo, NULL, &img->view));
 }
 void vkh_image_create_sampler (VkhImage img, VkFilter magFilter, VkFilter minFilter,
 							   VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode){
 	if(img->sampler != VK_NULL_HANDLE)
-		vkDestroySampler	(img->vkh->dev,img->sampler,NULL);
+		vkDestroySampler	(img->vkh->device,img->sampler,NULL);
 	VkSamplerCreateInfo samplerCreateInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
 											  .maxAnisotropy= 1.0,
 											  .addressModeU = addressMode,
@@ -178,7 +178,7 @@ void vkh_image_create_sampler (VkhImage img, VkFilter magFilter, VkFilter minFil
 											  .magFilter	= magFilter,
 											  .minFilter	= minFilter,
 											  .mipmapMode	= mipmapMode};
-	VK_CHECK_RESULT(vkCreateSampler(img->vkh->dev, &samplerCreateInfo, NULL, &img->sampler));
+	VK_CHECK_RESULT(vkCreateSampler(img->vkh->device, &samplerCreateInfo, NULL, &img->sampler));
 }
 void vkh_image_set_sampler (VkhImage img, VkSampler sampler){
 	img->sampler = sampler;
@@ -273,7 +273,7 @@ void vkh_image_destroy_sampler (VkhImage img) {
 	if (img==NULL)
 		return;
 	if(img->sampler != VK_NULL_HANDLE)
-		vkDestroySampler	(img->vkh->dev,img->sampler,NULL);
+		vkDestroySampler	(img->vkh->device,img->sampler,NULL);
 	img->sampler = VK_NULL_HANDLE;
 }
 
@@ -299,6 +299,6 @@ void vkh_image_set_name (VkhImage img, const char* name){
 uint64_t vkh_image_get_stride (VkhImage img) {
 	VkImageSubresource subres = {VK_IMAGE_ASPECT_COLOR_BIT,0,0};
 	VkSubresourceLayout layout = {0};
-	vkGetImageSubresourceLayout(img->vkh->dev, img->image, &subres, &layout);
+	vkGetImageSubresourceLayout(img->vkh->device, img->image, &subres, &layout);
 	return (uint64_t) layout.rowPitch;
 }

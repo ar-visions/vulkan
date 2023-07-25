@@ -25,7 +25,7 @@
 #include <vkh/vkh.h>
 
 typedef struct _vkh_queue_t{
-	VkhDevice		dev;
+	VkhDevice		vkh;
 	uint32_t		familyIndex;
 	VkQueue			queue;
 	VkQueueFlags	flags;

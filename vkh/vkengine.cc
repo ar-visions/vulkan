@@ -72,13 +72,13 @@ VkBool32 debugUtilsMessengerCallback (
 }
 
 VkInstance vkengine_get_inst (VkEngine e) {
-	return e->inst;
+	return e->instance;
 }
 
 VkhPhyInfo* vkengine_get_phyinfos (VkEngine e, uint32_t* count, VkSurfaceKHR surface) {
-	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->inst, count, NULL));
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->instance, count, NULL));
 	VkPhysicalDevice* phyDevices = (VkPhysicalDevice*)malloc((*count) * sizeof(VkPhysicalDevice));
-	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->inst, count, phyDevices));
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->instance, count, phyDevices));
 	VkhPhyInfo* infos = (VkhPhyInfo*)malloc((*count) * sizeof(VkhPhyInfo));
 
 	for (uint32_t i=0; i<(*count); i++)
@@ -198,7 +198,7 @@ VkEngine vkengine_create (
 	e->vk_device   = ion::Device::create(e->vk_gpu); /// extensions should be application defined; they are loaded only when available anyway. we dont NEED anything more complex
 	e->max_samples = max_samples;
 	e->refs        = 1;
-	e->inst        = e->vk_gpu->instance;
+	e->instance    = e->vk_gpu->instance;
 	e->window 	   = e->vk_gpu->window;
 	e->pi 	       = vkh_phyinfo_create(e->vk_gpu->phys, e->vk_gpu->surface);
 	e->memory_properties = e->pi->memProps; // redundant
@@ -208,7 +208,7 @@ VkEngine vkengine_create (
 	uint32_t qCount = 0;
 	float qPriorities[] = {0.0};
 
-	VkDeviceQueueCreateInfo pQueueInfos[] = { };
+	VkDeviceQueueCreateInfo pQueueInfos[4] = { };
 	if (vkh_phyinfo_create_presentable_queues	(e->pi, 1, qPriorities, &pQueueInfos[qCount]))
 		qCount++;
 	/*if (vkh_phyinfo_create_compute_queues		(e->pi, 1, qPriorities, &pQueueInfos[qCount]))

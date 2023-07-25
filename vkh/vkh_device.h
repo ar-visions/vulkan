@@ -31,12 +31,11 @@
 
 typedef struct _vkh_device_t {
 	size_t					refs;
-	VkDevice				dev;
+	VkDevice				device;
 	VkEngine				e;
 
 	VkInstance   instance() { return e->vk_gpu->instance; }
 	VkPhysicalDevice phys() { return e->vk_gpu->phys; }
-	VkDevice       device() { return e->vk_device->device; }
 
 } vkh_device_t;
 

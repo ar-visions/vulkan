@@ -363,6 +363,7 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     g->user_data = user_data;
     glfwSetWindowUserPointer(g->window, g.data);
     glfwSetFramebufferSizeCallback(g->window, impl::framebuffer_resized);
+    glfwShowWindow(g->window);
     return g;
 }
 
