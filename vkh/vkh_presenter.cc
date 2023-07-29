@@ -103,6 +103,7 @@ bool vkh_presenter_draw (VkhPresenter r) {
 								 .pWaitDstStageMask = &dstStageMask,
 								 .pCommandBuffers = &r->cmdBuffs[r->currentScBufferIndex]};
 
+	vkDeviceWaitIdle(r->vkh->device);
 	vkWaitForFences	(r->vkh->device, 1, &r->fenceDraw, VK_TRUE, FENCE_TIMEOUT);
 	vkResetFences	(r->vkh->device, 1, &r->fenceDraw);
 
