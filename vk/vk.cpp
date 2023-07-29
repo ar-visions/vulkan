@@ -1,5 +1,6 @@
-#include <math/math.hpp>
+#include <mx/mx.hpp>
 #include <image/image.hpp>
+
 #include <vk/vk.hpp>
 
 #define TINYOBJLOADER_IMPLEMENTATION

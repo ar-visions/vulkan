@@ -12,8 +12,8 @@
 
 #include <vk/tiny_obj_loader.h>
 
-#include <math/math.hpp>
 #include <mx/mx.hpp>
+#include <image/image.hpp>
 
 #include <watch/watch.hpp>
 
