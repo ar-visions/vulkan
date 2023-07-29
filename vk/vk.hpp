@@ -12,8 +12,9 @@
 
 #include <vk/tiny_obj_loader.h>
 
-#include <mx/mx.hpp>
 #include <math/math.hpp>
+#include <mx/mx.hpp>
+
 #include <watch/watch.hpp>
 
 //#include <iostream>
