@@ -68,7 +68,7 @@ struct Vulkan:mx {
     }
 };
 
-template <> struct is_singleton<Vulkan::impl> : true_type { };
+template <> struct is_singleton<Vulkan> : true_type { };
 
 struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR        capabilities = {};
