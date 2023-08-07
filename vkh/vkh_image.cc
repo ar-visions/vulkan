@@ -26,7 +26,7 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 				  VkFormat format, uint32_t width, uint32_t height,
 				  VkhMemoryUsage memprops, VkImageUsageFlags usage,
 				  VkSampleCountFlagBits samples, VkImageTiling tiling,
-				  uint32_t mipLevels, uint32_t arrayLayers){
+				  uint32_t mipLevels, uint32_t arrayLayers, void *import = nullptr){
 
 	VkhImage img = (VkhImage)calloc(1,sizeof(vkh_image_t));
 
@@ -46,6 +46,28 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 	pInfo->mipLevels		= mipLevels;
 	pInfo->arrayLayers		= arrayLayers;
 	pInfo->samples			= samples;
+
+	/// support different forms of platform imports (dx on windows, metal on macos, hopefully nothing on linux)
+    if (false && import) {
+        /// this stuff was added mid 2022
+#ifdef __APPLE__
+        struct MTLTexture;
+        struct VkImportMetalTextureInfoEXT {
+            VkStructureType sType;
+            const void* pNext;
+            VkImageAspectFlags plane;
+            MTLTexture* mtlTexture;
+        };
+        #define VK_STRUCTURE_TYPE_IMPORT_METAL_TEXTURE_INFO_EXT (VkStructureType)1000311007
+        VkImportMetalTextureInfoEXT metal_import = {
+            .sType 		= VK_STRUCTURE_TYPE_IMPORT_METAL_TEXTURE_INFO_EXT,
+            .plane 		= VK_IMAGE_ASPECT_COLOR_BIT,
+            .mtlTexture = (MTLTexture*)import
+        };
+
+        pInfo->pNext = &metal_import;
+#endif
+    }
 
 	/*
 	img->imported = false;
@@ -125,10 +147,10 @@ VkhImage vkh_tex2d_array_create (VkhDevice vkh,
 VkhImage vkh_image_create (VkhDevice vkh,
 						   VkFormat format, uint32_t width, uint32_t height, VkImageTiling tiling,
 						   VkhMemoryUsage memprops,
-						   VkImageUsageFlags usage)
+						   VkImageUsageFlags usage, void *import)
 {
 	return _vkh_image_create (vkh, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
-					  VK_SAMPLE_COUNT_1_BIT, tiling, 1, 1);
+					  VK_SAMPLE_COUNT_1_BIT, tiling, 1, 1, import);
 }
 //create vkhImage from existing VkImage
 VkhImage vkh_image_import (VkhDevice vkh, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height) {

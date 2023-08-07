@@ -23,7 +23,7 @@
 
 using namespace ion;
 
-static const bool               enable_validation = is_debug();
+static const bool               enable_validation = false; //is_debug();
 static VkInstance               instance = 0;
 static VkDebugUtilsMessengerEXT debugMessenger;
 
@@ -33,7 +33,8 @@ const std::vector<symbol> validationLayers = {
 
 const std::vector<symbol> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    "VK_KHR_portability_subset"
+    "VK_KHR_portability_subset",
+    "VK_EXT_metal_objects"
 };
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -60,6 +61,7 @@ std::vector<symbol> Vulkan::impl::getRequiredExtensions() {
     #ifdef __APPLE__
     extensions.push_back("VK_KHR_portability_enumeration");
     extensions.push_back("VK_KHR_get_physical_device_properties2");
+    extensions.push_back("VK_EXT_metal_surface");
     #endif
 
     if (enable_validation)
@@ -719,7 +721,9 @@ VkImageView Device::impl::createImageView(VkImage image, VkFormat format, VkImag
     return imageView;
 }
 
-void Device::impl::createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory) {
+void Device::impl::createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkSampleCountFlagBits numSamples,
+        VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+        VkImage& image, VkDeviceMemory& imageMemory, void *platform_import) {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     imageInfo.imageType = VK_IMAGE_TYPE_2D;

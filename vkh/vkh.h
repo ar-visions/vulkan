@@ -247,7 +247,7 @@ vkh_public
 VkhImage vkh_image_import       (VkhDevice vkh, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height);
 vkh_public
 VkhImage vkh_image_create       (VkhDevice vkh, VkFormat format, uint32_t width, uint32_t height, VkImageTiling tiling,
-                                                                        VkhMemoryUsage memprops, VkImageUsageFlags usage);
+                                 VkhMemoryUsage memprops, VkImageUsageFlags usage, void *import = ion::null);
 vkh_public
 VkhImage vkh_image_ms_create    (VkhDevice vkh, VkFormat format, VkSampleCountFlagBits num_samples, uint32_t width, uint32_t height,
                                                                         VkhMemoryUsage memprops, VkImageUsageFlags usage);
