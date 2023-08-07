@@ -61,7 +61,7 @@ std::vector<symbol> Vulkan::impl::getRequiredExtensions() {
     #ifdef __APPLE__
     extensions.push_back("VK_KHR_portability_enumeration");
     extensions.push_back("VK_KHR_get_physical_device_properties2");
-    extensions.push_back("VK_EXT_metal_surface");
+    //extensions.push_back("VK_EXT_metal_surface");
     #endif
 
     if (enable_validation)
@@ -134,7 +134,16 @@ void Vulkan::impl::init() {
     createInfo.pApplicationInfo = &app_info;
     createInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 
+
+
     auto extensions = getRequiredExtensions();
+
+    extensions = std::vector<symbol>();
+    extensions.push_back("VK_KHR_surface");
+    extensions.push_back("VK_EXT_metal_surface");
+    //extensions.push_back("VK_KHR_portability_enumeration"); -- this version of moltenvk does not support this
+    extensions.push_back("VK_KHR_get_physical_device_properties2");
+
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data(); // VK_KHR_surface ?
 

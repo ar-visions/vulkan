@@ -48,23 +48,14 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 	pInfo->samples			= samples;
 
 	/// support different forms of platform imports (dx on windows, metal on macos, hopefully nothing on linux)
-    if (false && import) {
-        /// this stuff was added mid 2022
+    if (import) {
 #ifdef __APPLE__
         struct MTLTexture;
-        struct VkImportMetalTextureInfoEXT {
-            VkStructureType sType;
-            const void* pNext;
-            VkImageAspectFlags plane;
-            MTLTexture* mtlTexture;
-        };
-        #define VK_STRUCTURE_TYPE_IMPORT_METAL_TEXTURE_INFO_EXT (VkStructureType)1000311007
         VkImportMetalTextureInfoEXT metal_import = {
             .sType 		= VK_STRUCTURE_TYPE_IMPORT_METAL_TEXTURE_INFO_EXT,
             .plane 		= VK_IMAGE_ASPECT_COLOR_BIT,
             .mtlTexture = (MTLTexture*)import
         };
-
         pInfo->pNext = &metal_import;
 #endif
     }

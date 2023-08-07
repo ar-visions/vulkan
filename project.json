@@ -12,13 +12,19 @@
             "environment": {
                 "VULKAN_SDK":"%INSTALL_PREFIX%/lib/Frameworks/MoltenVK",
                 "VULKAN_LIBRARY_NAME":"MoltenVK"
+            },
+            "cmake":{
+                "args": ["-DVK_USE_PLATFORM_METAL_EXT=Yes"]
             }
         },
         {
             "name":     "glfw",
             "version":  "3.3.8",
             "commit":   "7482de6",
-            "url":      "https://github.com/glfw/glfw"
+            "url":      "https://github.com/glfw/glfw",
+            "cmake": {
+                "args": ["-DGLFW_VULKAN_STATIC=Yes"]
+            }
         },
         {
             "name":     "freetype",
