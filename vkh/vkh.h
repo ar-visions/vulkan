@@ -224,8 +224,8 @@ void vkh_device_destroy_sampler (VkhDevice dev, VkSampler sampler);
  ****************/
 vkh_public
 VkhPresenter vkh_presenter_create (VkhDevice dev, uint32_t presentQueueFamIdx, VkSurfaceKHR surface,
-                                                                   uint32_t width, uint32_t height,
-                                                                   VkFormat preferedFormat, VkPresentModeKHR presentMode);
+                                uint32_t width, uint32_t height,
+                                    VkFormat preferedFormat, VkPresentModeKHR presentMode, bool use_dpi);
 
 vkh_public VkhPresenter vkh_presenter_grab(VkhPresenter r);
 

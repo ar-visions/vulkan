@@ -135,6 +135,9 @@ VkhImage vkh_tex2d_array_create (VkhDevice vkh,
 	return _vkh_image_create (vkh, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
 		VK_SAMPLE_COUNT_1_BIT, VK_IMAGE_TILING_OPTIMAL, 1, layers);
 }
+
+/// Vkh Device needs a command pool.  its just not complete as-is
+
 VkhImage vkh_image_create (VkhDevice vkh,
 						   VkFormat format, uint32_t width, uint32_t height, VkImageTiling tiling,
 						   VkhMemoryUsage memprops,
@@ -143,6 +146,7 @@ VkhImage vkh_image_create (VkhDevice vkh,
 	return _vkh_image_create (vkh, VK_IMAGE_TYPE_2D, format, width, height, memprops,usage,
 					  VK_SAMPLE_COUNT_1_BIT, tiling, 1, 1, import);
 }
+
 //create vkhImage from existing VkImage
 VkhImage vkh_image_import (VkhDevice vkh, VkImage vkImg, VkFormat format, uint32_t width, uint32_t height) {
 	VkhImage img = (VkhImage)calloc(1,sizeof(vkh_image_t));

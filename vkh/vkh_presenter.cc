@@ -36,7 +36,7 @@ void _swapchain_destroy (VkhPresenter r);
 void _init_phy_surface	(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR presentMode);
 
 VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, VkSurfaceKHR surface, uint32_t width, uint32_t height,
-						   VkFormat preferedFormat, VkPresentModeKHR presentMode) {
+						   VkFormat preferedFormat, VkPresentModeKHR presentMode, bool use_dpi) {
 	VkhPresenter r 		= (VkhPresenter)calloc(1,sizeof(vkh_presenter_t));
 	r->refs 			= 1;
 	r->vkh 				= vkh_device_grab(vkh);
@@ -44,8 +44,8 @@ VkhPresenter vkh_presenter_create (VkhDevice vkh, uint32_t presentQueueFamIdx, V
 	r->surface 			= surface;
 	r->scale_x			= vkh->e->vk_gpu->dpi_scale.x;
 	r->scale_y			= vkh->e->vk_gpu->dpi_scale.y;
-	r->width 			= width  * r->scale_x;
-	r->height 			= height * r->scale_y;
+	r->width 			= width  * (use_dpi ? r->scale_x : 1.0);
+	r->height 			= height * (use_dpi ? r->scale_y : 1.0);
 	vkGetDeviceQueue(r->vkh->device, r->qFam, 0, &r->queue);
 
 	r->cmdPool			= vkh_cmd_pool_create  (r->vkh, presentQueueFamIdx, 0);

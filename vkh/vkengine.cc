@@ -224,7 +224,7 @@ VkEngine vkengine_create (
 	/// create presenter associated to engine/window
 	e->renderer = vkh_presenter_create(
 		e->vkh, (uint32_t) e->pi->pQueue, e->vk_gpu->surface,
-		width, height, VK_FORMAT_B8G8R8A8_UNORM, presentMode);
+		width, height, VK_FORMAT_B8G8R8A8_UNORM, presentMode, true);
 
 	singleton = e;
 	return e;
