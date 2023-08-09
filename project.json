@@ -23,7 +23,7 @@
             "commit":   "7482de6",
             "url":      "https://github.com/glfw/glfw",
             "cmake": {
-                "args": ["-DGLFW_VULKAN_STATIC=Yes"]
+                "args-mac": ["-DGLFW_VULKAN_STATIC=Yes"]
             }
         },
         {

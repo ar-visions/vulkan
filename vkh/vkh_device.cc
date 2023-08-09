@@ -161,14 +161,15 @@ VkSampler vkh_device_create_sampler (VkhDevice vkh, VkFilter magFilter, VkFilter
 	VkSampler 		    sampler 		  = VK_NULL_HANDLE;
 	VkSamplerCreateInfo samplerCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.maxAnisotropy= 1.0,
+		.magFilter	= magFilter,
+		.minFilter	= minFilter,
+		.mipmapMode	= mipmapMode,
 		.addressModeU = addressMode,
 		.addressModeV = addressMode,
 		.addressModeW = addressMode,
-		.magFilter	= magFilter,
-		.minFilter	= minFilter,
-		.mipmapMode	= mipmapMode
+		.maxAnisotropy= 1.0
 	};
+
 	VK_CHECK_RESULT(vkCreateSampler(vkh->device, &samplerCreateInfo, NULL, &sampler));
 	return sampler;
 }

@@ -192,14 +192,16 @@ void vkh_image_create_sampler (VkhImage img, VkFilter magFilter, VkFilter minFil
 							   VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode){
 	if(img->sampler != VK_NULL_HANDLE)
 		vkDestroySampler	(img->vkh->device,img->sampler,NULL);
-	VkSamplerCreateInfo samplerCreateInfo = { .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-											  .maxAnisotropy= 1.0,
-											  .addressModeU = addressMode,
-											  .addressModeV = addressMode,
-											  .addressModeW = addressMode,
-											  .magFilter	= magFilter,
-											  .minFilter	= minFilter,
-											  .mipmapMode	= mipmapMode};
+	VkSamplerCreateInfo samplerCreateInfo = {
+		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+		.magFilter	= magFilter,
+		.minFilter	= minFilter,
+		.mipmapMode	= mipmapMode,
+		.addressModeU = addressMode,
+		.addressModeV = addressMode,
+		.addressModeW = addressMode,
+		.maxAnisotropy= 1.0
+	};
 	VK_CHECK_RESULT(vkCreateSampler(img->vkh->device, &samplerCreateInfo, NULL, &img->sampler));
 }
 void vkh_image_set_sampler (VkhImage img, VkSampler sampler){
@@ -230,9 +232,11 @@ VkImageLayout vkh_image_get_layout (VkhImage img){
 	return img->layout;
 }
 VkDescriptorImageInfo vkh_image_get_descriptor (VkhImage img, VkImageLayout imageLayout){
-	VkDescriptorImageInfo desc = { .imageView = img->view,
-								   .imageLayout = imageLayout,
-								   .sampler = img->sampler };
+	VkDescriptorImageInfo desc = {
+		.sampler = img->sampler,
+		.imageView = img->view,
+		.imageLayout = imageLayout
+	};
 	return desc;
 }
 
