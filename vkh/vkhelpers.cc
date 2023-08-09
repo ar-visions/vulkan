@@ -128,8 +128,9 @@ VkCommandPool vkh_cmd_pool_create (VkhDevice vkh, uint32_t qFamIndex, VkCommandP
 	VkCommandPool cmdPool;
 	VkCommandPoolCreateInfo cmd_pool_info = { .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 											  .pNext = NULL,
+											  .flags = flags,
 											  .queueFamilyIndex = qFamIndex,
-											  .flags = flags };
+											};
 	VK_CHECK_RESULT (vkCreateCommandPool(vkh->device, &cmd_pool_info, NULL, &cmdPool));
 	return cmdPool;
 }
@@ -297,8 +298,9 @@ VkShaderModule vkh_load_module(VkDevice dev, const char* path){
 	size_t filelength;
 	uint32_t* pCode = (uint32_t*)read_spv(path, &filelength);
 	VkShaderModuleCreateInfo createInfo = { .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+											.codeSize = filelength,
 											.pCode = pCode,
-											.codeSize = filelength };
+										  };
 	VK_CHECK_RESULT(vkCreateShaderModule(dev, &createInfo, NULL, &module));
 	free (pCode);
 	//assert(module != VK_NULL_HANDLE);

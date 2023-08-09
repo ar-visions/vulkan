@@ -95,13 +95,14 @@ bool vkh_presenter_draw (VkhPresenter r) {
 
 	VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	VkSubmitInfo submit_info = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-								 .commandBufferCount = 1,
-								 .signalSemaphoreCount = 1,
-								 .pSignalSemaphores = &r->semaDrawEnd,
 								 .waitSemaphoreCount = 1,
 								 .pWaitSemaphores = &r->semaPresentEnd,
 								 .pWaitDstStageMask = &dstStageMask,
-								 .pCommandBuffers = &r->cmdBuffs[r->currentScBufferIndex]};
+								 .commandBufferCount = 1,
+								 .pCommandBuffers = &r->cmdBuffs[r->currentScBufferIndex],
+								 .signalSemaphoreCount = 1,
+								 .pSignalSemaphores = &r->semaDrawEnd
+								 };
 
 	vkDeviceWaitIdle(r->vkh->device);
 	vkWaitForFences	(r->vkh->device, 1, &r->fenceDraw, VK_TRUE, FENCE_TIMEOUT);
@@ -111,10 +112,10 @@ bool vkh_presenter_draw (VkhPresenter r) {
 
 	/* Now present the image in the window */
 	VkPresentInfoKHR present = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-								 .swapchainCount = 1,
-								 .pSwapchains = &r->swapChain,
 								 .waitSemaphoreCount = 1,
 								 .pWaitSemaphores = &r->semaDrawEnd,
+								 .swapchainCount = 1,
+								 .pSwapchains = &r->swapChain,
 								 .pImageIndices = &r->currentScBufferIndex };
 
 	/* Make sure command buffer is finished before presenting */
@@ -150,11 +151,9 @@ void vkh_presenter_build_blit_cmd (VkhPresenter r, VkImage blitSource, uint32_t 
 								.dstOffset = {0,0,0},
 								.extent = {MIN(w,r->width), MIN(h,r->height),1}};*/
 		VkImageBlit bregion = { .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
+								.srcOffsets = {{ 0 }, { ion::i32(src_w), ion::i32(src_h), 1 }},
 								.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-								.srcOffsets[0] = { 0 },
-								.srcOffsets[1] = { src_w, src_h, 1 },
-								.dstOffsets[0] = { 0 },
-								.dstOffsets[1] = { dst_w, dst_h, 1 }
+								.dstOffsets = {{ 0 }, { ion::i32(dst_w), ion::i32(dst_h), 1 }}
 							  };
 
 		vkCmdBlitImage(cb, blitSource, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bltDstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bregion, VK_FILTER_NEAREST);

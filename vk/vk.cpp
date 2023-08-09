@@ -816,14 +816,17 @@ void Device::impl::transitionImageLayout(VkImage image, VkFormat format, VkImage
 
 void Device::impl::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
     VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
     VkBufferImageCopy region {
         .bufferOffset = 0,
         .bufferRowLength = 0,
         .bufferImageHeight = 0,
-        .imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-        .imageSubresource.mipLevel = 0,
-        .imageSubresource.baseArrayLayer = 0,
-        .imageSubresource.layerCount = 1,
+        .imageSubresource = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .mipLevel = 0,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        },
         .imageOffset = {0, 0, 0},
         .imageExtent = {
             width,
@@ -889,22 +892,22 @@ void Device::impl::createLogicalDevice() {
         queueCreateInfo.pQueuePriorities = &queuePriority;
         queueCreateInfos.push_back(queueCreateInfo);
     }
-
+    
     /// set features used to mask of supported
     VkPhysicalDeviceFeatures featured_used {
-        .samplerAnisotropy = gpu->support.samplerAnisotropy,
+        .sampleRateShading = gpu->support.sampleRateShading,
+	    .logicOp		   = gpu->support.logicOp,
         .fillModeNonSolid  = gpu->support.fillModeNonSolid,
-	    .sampleRateShading = gpu->support.sampleRateShading,
-	    .logicOp		   = gpu->support.logicOp
+        .samplerAnisotropy = gpu->support.samplerAnisotropy
     };
 
     VkDeviceCreateInfo createInfo {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
         .queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size()),
         .pQueueCreateInfos       = queueCreateInfos.data(),
-        .pEnabledFeatures        = &featured_used,
         .enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size()),
-        .ppEnabledExtensionNames = deviceExtensions.data()
+        .ppEnabledExtensionNames = deviceExtensions.data(),
+        .pEnabledFeatures        = &featured_used
     };
 
 
