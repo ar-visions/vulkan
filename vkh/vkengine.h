@@ -63,7 +63,9 @@ typedef struct _vk_engine_t {
 	ion::GPU							vk_gpu;
 	ion::Device							vk_device;
 	VkhPhyInfo							pi;
+	ion::Vulkan							vk;
 	VkInstance							instance;
+	uint32_t 							version;
 	VkPhysicalDeviceMemoryProperties	memory_properties;
 	VkPhysicalDeviceProperties			gpu_props;
 	VkhDevice							vkh;

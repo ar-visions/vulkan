@@ -72,13 +72,13 @@ VkBool32 debugUtilsMessengerCallback (
 }
 
 VkInstance vkengine_get_inst (VkEngine e) {
-	return e->instance;
+	return e->vk->inst();
 }
 
 VkhPhyInfo* vkengine_get_phyinfos (VkEngine e, uint32_t* count, VkSurfaceKHR surface) {
-	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->instance, count, NULL));
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->vk->inst(), count, NULL));
 	VkPhysicalDevice* phyDevices = (VkPhysicalDevice*)malloc((*count) * sizeof(VkPhysicalDevice));
-	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->instance, count, phyDevices));
+	VK_CHECK_RESULT(vkEnumeratePhysicalDevices (e->vk->inst(), count, phyDevices));
 	VkhPhyInfo* infos = (VkhPhyInfo*)malloc((*count) * sizeof(VkhPhyInfo));
 
 	for (uint32_t i=0; i<(*count); i++)
@@ -178,6 +178,7 @@ VkEngine vkengine_create (
 	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, VkSampleCountFlagBits max_samples,
 	uint32_t width, uint32_t height, int dpi_index, void *user_data)
 {
+
 	if (singleton)
 		return singleton;
 	
@@ -195,10 +196,10 @@ VkEngine vkengine_create (
 
 	VkEngine e     = (VkEngine)calloc(1, sizeof(vk_engine_t));
 	e->refs        = 1;
+	e->vk 		   = ion::Vulkan { version_major, version_minor }; /// if already loaded, we are going to get the prior version (per design)
 	e->vk_gpu      = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)user_data);
 	e->vk_device   = ion::Device::create(e->vk_gpu); /// extensions should be application defined; they are loaded only when available anyway. we dont NEED anything more complex
 	e->max_samples = max_samples;
-	e->instance    = e->vk_gpu->instance;
 	e->window 	   = e->vk_gpu->window;
 	e->pi 	       = vkh_phyinfo_create(e->vk_gpu->phys, e->vk_gpu->surface);
 	e->memory_properties = e->pi->memProps; // redundant
@@ -273,7 +274,7 @@ void vkengine_set_title(VkEngine e, const char* title) {
 }
 
 VkInstance vkengine_get_instance(VkEngine e) {
-	return e->vk_gpu->instance;
+	return e->vk->inst();
 }
 
 VkDevice vkengine_get_device(VkEngine e) {

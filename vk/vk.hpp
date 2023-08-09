@@ -50,6 +50,7 @@ struct Vulkan:mx {
     struct impl {
         int v_major = 1;
         int v_minor = 0;
+        uint32_t version = VK_MAKE_VERSION(1, 0, 0);
         VkApplicationInfo app_info;
         void init();
         ~impl();
@@ -65,6 +66,7 @@ struct Vulkan:mx {
     Vulkan(int v_major, int v_minor):Vulkan() {
         data->v_major = v_major;
         data->v_minor = v_minor;
+        data->version = VK_MAKE_VERSION(v_major, v_minor, 0);
     }
 };
 
