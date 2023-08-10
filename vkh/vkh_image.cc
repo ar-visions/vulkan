@@ -31,6 +31,8 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 	VkhImage img = (VkhImage)calloc(1,sizeof(vkh_image_t));
 
 	img->vkh = vkh_device_grab(vkh);
+	img->width = width;
+	img->height = height;
 
 	VkImageCreateInfo* pInfo = &img->infos;
 	pInfo->sType			= VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;

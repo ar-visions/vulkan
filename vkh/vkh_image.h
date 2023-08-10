@@ -26,11 +26,13 @@
 //#include "vk_mem_alloc.h"
 #include <async/tinycthread.h>
 
-typedef struct _vkh_image_t {
+typedef struct _vkh_image_t { /// should store size here.  why not
 	size_t					refs;
 	VkhDevice				vkh;
 	VkImageCreateInfo		infos;
 	VkImage					image;
+	uint32_t				width;
+	uint32_t				height;
 #ifdef VKH_USE_VMA
 	VmaAllocation			alloc;
 	VmaAllocationInfo		allocInfo;
