@@ -196,7 +196,6 @@ VkEngine vkengine_create (
 
 	VkEngine e     = (VkEngine)calloc(1, sizeof(vk_engine_t));
 	e->refs        = 1;
-	e->vk 		   = ion::Vulkan { version_major, version_minor }; /// if already loaded, we are going to get the prior version (per design)
 	e->vk_gpu      = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)user_data);
 	e->vk_device   = ion::Device::create(e->vk_gpu); /// extensions should be application defined; they are loaded only when available anyway. we dont NEED anything more complex
 	e->max_samples = max_samples;
