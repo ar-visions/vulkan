@@ -5,5 +5,3 @@ if(mac)
 elseif(linux)
     dep(X11)
 endif()
-
-defines(VKH_USE_VMA)

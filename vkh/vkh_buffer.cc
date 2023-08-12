@@ -52,7 +52,7 @@ void vkh_buffer_init(VkhDevice vkh, VkBufferUsageFlags usage, VkhMemoryUsage mem
 	buff->allocCreateInfo.usage	= (VmaMemoryUsage)memprops;
 	if (mapped)
 		buff->allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-	VK_CHECK_RESULT(vmaCreateBuffer(vkh->allocator, pInfo, &buff->allocCreateInfo, &buff->buffer, &buff->alloc, &buff->allocInfo));
+	VK_CHECK_RESULT(vmaCreateBuffer(vkh->e->allocator, pInfo, &buff->allocCreateInfo, &buff->buffer, &buff->alloc, &buff->allocInfo));
 #else
 	VK_CHECK_RESULT(vkCreateBuffer(vkh->device, pInfo, NULL, &buff->buffer));	
 	_set_size_and_bind (vkh, usage, memprops, size, buff);
@@ -71,7 +71,7 @@ VkhBuffer vkh_buffer_create(VkhDevice vkh, VkBufferUsageFlags usage, VkhMemoryUs
 void vkh_buffer_reset(VkhBuffer buff){
 	if (buff->buffer)
 #ifdef VKH_USE_VMA
-		vmaDestroyBuffer(buff->vkh->allocator, buff->buffer, buff->alloc);
+		vmaDestroyBuffer(buff->vkh->e->allocator, buff->buffer, buff->alloc);
 #else
 		vkDestroyBuffer(buff->vkh->device, buff->buffer, NULL);
 	if (buff->memory)
@@ -81,7 +81,7 @@ void vkh_buffer_reset(VkhBuffer buff){
 void vkh_buffer_destroy(VkhBuffer buff){
 	if (buff->buffer)
 #ifdef VKH_USE_VMA
-		vmaDestroyBuffer(buff->vkh->allocator, buff->buffer, buff->alloc);
+		vmaDestroyBuffer(buff->vkh->e->allocator, buff->buffer, buff->alloc);
 #else
 		vkDestroyBuffer(buff->vkh->device, buff->buffer, NULL);
 	if (buff->memory)
@@ -94,7 +94,7 @@ void vkh_buffer_resize(VkhBuffer buff, VkDeviceSize newSize, bool mapped){
 	vkh_buffer_reset(buff);
 	buff->infos.size = newSize;
 #ifdef VKH_USE_VMA
-	VK_CHECK_RESULT(vmaCreateBuffer(buff->vkh->allocator, &buff->infos, &buff->allocCreateInfo, &buff->buffer, &buff->alloc, &buff->allocInfo));
+	VK_CHECK_RESULT(vmaCreateBuffer(buff->vkh->e->allocator, &buff->infos, &buff->allocCreateInfo, &buff->buffer, &buff->alloc, &buff->allocInfo));
 #else
 	VK_CHECK_RESULT(vkCreateBuffer(buff->vkh->device, &buff->infos, NULL, &buff->buffer));
 	_set_size_and_bind (buff->vkh, buff->usageFlags, buff->memprops, buff->infos.size, buff);
@@ -114,14 +114,14 @@ VkDescriptorBufferInfo vkh_buffer_get_descriptor (VkhBuffer buff){
 
 VkResult vkh_buffer_map(VkhBuffer buff){
 #ifdef VKH_USE_VMA
-	return vmaMapMemory(buff->vkh->allocator, buff->alloc, &buff->mapped);
+	return vmaMapMemory(buff->vkh->e->allocator, buff->alloc, &buff->mapped);
 #else
 	return vkMapMemory(buff->vkh->device, buff->memory, 0, VK_WHOLE_SIZE, 0, &buff->mapped);
 #endif
 }
 void vkh_buffer_unmap(VkhBuffer buff){
 #ifdef VKH_USE_VMA
-	vmaUnmapMemory(buff->vkh->allocator, buff->alloc);
+	vmaUnmapMemory(buff->vkh->e->allocator, buff->alloc);
 #else
 	if (!buff->mapped)
 		return;
@@ -142,7 +142,7 @@ void* vkh_buffer_get_mapped_pointer (VkhBuffer buff){
 }
 void vkh_buffer_flush (VkhBuffer buff){
 #ifdef VKH_USE_VMA
-	vmaFlushAllocation (buff->vkh->allocator, buff->alloc, buff->allocInfo.offset, buff->allocInfo.size);
+	vmaFlushAllocation (buff->vkh->e->allocator, buff->alloc, buff->allocInfo.offset, buff->allocInfo.size);
 #else
 #endif
 }

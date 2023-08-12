@@ -70,7 +70,7 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
 	img->view	= VK_NULL_HANDLE;*/
 #ifdef VKH_USE_VMA
 	VmaAllocationCreateInfo allocInfo = { .usage = (VmaMemoryUsage)memprops };
-	VK_CHECK_RESULT(vmaCreateImage (vkh->allocator, pInfo, &allocInfo, &img->image, &img->alloc, &img->allocInfo));
+	VK_CHECK_RESULT(vmaCreateImage (vkh->e->allocator, pInfo, &allocInfo, &img->image, &img->alloc, &img->allocInfo));
 #else
 	VK_CHECK_RESULT(vkCreateImage(vkh->device, pInfo, NULL, &img->image));
 	VkMemoryRequirements memReq;
@@ -111,7 +111,7 @@ void vkh_image_drop(VkhImage img)
 
 	if (!img->imported) {
 #ifdef VKH_USE_VMA
-		vmaDestroyImage	(img->vkh->allocator, img->image, img->alloc);
+		vmaDestroyImage	(img->vkh->e->allocator, img->image, img->alloc);
 #else
 		vkDestroyImage	(img->vkh->device, img->image, NULL);
 		vkFreeMemory	(img->vkh->device, img->memory, NULL);
@@ -241,6 +241,72 @@ VkDescriptorImageInfo vkh_image_get_descriptor (VkhImage img, VkImageLayout imag
 	};
 	return desc;
 }
+/*
+/// dont need args for the other things until i need them
+void vkh_image_set_layout_sync(VkhImage image, VkImageLayout layout) {
+	
+	VkCommandBuffer commandBuffer = image->vkh->e->vk_device->command_begin();
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.oldLayout = image->layout;
+	barrier.newLayout = layout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image->image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	switch (image->layout) {
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_PREINITIALIZED:
+			barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+			break;
+		default:
+			break;
+	}
+
+	switch (layout) {
+		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			break;
+		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+			barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			break;
+		default:
+			break;
+	}
+
+	vkCmdPipelineBarrier(
+		commandBuffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &barrier
+	);
+
+	image->vkh->e->vk_device->command_submit(commandBuffer);
+	image->layout = layout;
+}
+*/
 
 void vkh_image_set_layout(VkCommandBuffer cmdBuff, VkhImage image, VkImageAspectFlags aspectMask,
 						  VkImageLayout old_image_layout, VkImageLayout new_image_layout,
@@ -308,14 +374,14 @@ void vkh_image_destroy_sampler (VkhImage img) {
 void* vkh_image_map (VkhImage img) {
 	void* data;
 #ifdef VKH_USE_VMA
-	vmaMapMemory(img->vkh->allocator, img->alloc, &data);
+	vmaMapMemory(img->vkh->e->allocator, img->alloc, &data);
 #else
 #endif
 	return data;
 }
 void vkh_image_unmap (VkhImage img) {
 #ifdef VKH_USE_VMA
-	vmaUnmapMemory(img->vkh->allocator, img->alloc);
+	vmaUnmapMemory(img->vkh->e->allocator, img->alloc);
 #else
 #endif
 }

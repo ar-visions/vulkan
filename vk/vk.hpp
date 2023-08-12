@@ -32,6 +32,9 @@
 #include <set>
 //#include <unordered_map>
 
+#define VMA_VULKAN_VERSION 1001000 // Vulkan 1.1 (skia does not use 1.2)
+#include <vk/vk_mem_alloc.h>
+
 namespace ion {
 
 static const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -177,8 +180,8 @@ struct Device:mx {
         void createFramebuffers();
         void createSyncObjects();
         void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
-        VkCommandBuffer beginSingleTimeCommands();
-        void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+        VkCommandBuffer command_begin();
+        void command_submit(VkCommandBuffer commandBuffer);
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         void createCommandBuffers();
         void createCommandPool();

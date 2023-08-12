@@ -265,6 +265,11 @@ void vkh_image_create_view      (VkhImage img, VkImageViewType viewType, VkImage
 vkh_public
 void vkh_image_create_sampler   (VkhImage img, VkFilter magFilter, VkFilter minFilter,
                                                                         VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode);
+
+
+vkh_public
+void vkh_image_set_layout_sync(VkhImage image, VkImageLayout to);
+
 vkh_public
 void vkh_image_set_layout       (VkCommandBuffer cmdBuff, VkhImage image, VkImageAspectFlags aspectMask, VkImageLayout old_image_layout,
                                                                         VkImageLayout new_image_layout, VkPipelineStageFlags src_stages, VkPipelineStageFlags dest_stages);

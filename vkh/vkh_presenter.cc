@@ -87,6 +87,7 @@ bool vkh_presenter_acquireNextImage (VkhPresenter r, VkFence fence, VkSemaphore 
 }
 
 
+
 bool vkh_presenter_draw (VkhPresenter r) {
 	if (!vkh_presenter_acquireNextImage (r, VK_NULL_HANDLE, r->semaPresentEnd)) {
 		vkh_presenter_create_swapchain (r);

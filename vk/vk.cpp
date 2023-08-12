@@ -23,7 +23,7 @@
 
 using namespace ion;
 
-static const bool               enable_validation = false; //is_debug();
+static const bool               enable_validation = is_debug();
 static VkInstance               instance = 0;
 static VkDebugUtilsMessengerEXT debugMessenger;
 
@@ -33,8 +33,9 @@ const std::vector<symbol> validationLayers = {
 
 const std::vector<symbol> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    "VK_KHR_portability_subset",
-    "VK_EXT_metal_objects"
+    "VK_KHR_portability_subset", /// goes along with the Instance ext: VK_KHR_portability_enumeration
+    "VK_EXT_metal_objects",
+    "VK_KHR_dedicated_allocation" /// for VMA with Vulkan >= 1.1
 };
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -141,8 +142,9 @@ void Vulkan::impl::init() {
     extensions = std::vector<symbol>();
     extensions.push_back("VK_KHR_surface");
     extensions.push_back("VK_EXT_metal_surface");
-    //extensions.push_back("VK_KHR_portability_enumeration"); -- this version of moltenvk does not support this
+    extensions.push_back("VK_KHR_portability_enumeration"); /// there is a _subset extension too but not sure if thats device
     extensions.push_back("VK_KHR_get_physical_device_properties2");
+    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data(); // VK_KHR_surface ?
@@ -339,7 +341,7 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     g->window = initWindow(sz);
     g->sz = sz;
     
-    Vulkan vk { 1, 2 }; /// singleton; if constructed prior with a version, that remains set
+    Vulkan vk { 1, 1 }; /// singleton; if constructed prior with a version, that remains set
     vk->init();
 
     g->instance = vk->inst();
@@ -511,7 +513,7 @@ void Device::impl::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkM
     vkBindBufferMemory(device, buffer, bufferMemory, 0);
 }
 
-VkCommandBuffer Device::impl::beginSingleTimeCommands() {
+VkCommandBuffer Device::impl::command_begin() {
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -530,7 +532,7 @@ VkCommandBuffer Device::impl::beginSingleTimeCommands() {
     return commandBuffer;
 }
 
-void Device::impl::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+void Device::impl::command_submit(VkCommandBuffer commandBuffer) {
     vkEndCommandBuffer(commandBuffer);
 
     VkSubmitInfo submitInfo{};
@@ -545,13 +547,13 @@ void Device::impl::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
 }
 
 void Device::impl::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = command_begin();
 
     VkBufferCopy copyRegion{};
     copyRegion.size = size;
     vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
 
-    endSingleTimeCommands(commandBuffer);
+    command_submit(commandBuffer);
 }
 
 void Device::impl::createCommandBuffers() {
@@ -631,7 +633,7 @@ void Device::impl::generateMipmaps(VkImage image, VkFormat imageFormat, int32_t 
         throw std::runtime_error("texture image format does not support linear blitting!");
     }
 
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = command_begin();
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -706,7 +708,7 @@ void Device::impl::generateMipmaps(VkImage image, VkFormat imageFormat, int32_t 
         0, nullptr,
         1, &barrier);
 
-    endSingleTimeCommands(commandBuffer);
+    command_submit(commandBuffer);
 }
 
 
@@ -768,7 +770,7 @@ void Device::impl::createImage(uint32_t width, uint32_t height, uint32_t mipLeve
 }
 
 void Device::impl::transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = command_begin();
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -811,11 +813,11 @@ void Device::impl::transitionImageLayout(VkImage image, VkFormat format, VkImage
         1, &barrier
     );
 
-    endSingleTimeCommands(commandBuffer);
+    command_submit(commandBuffer);
 }
 
 void Device::impl::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height) {
-    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = command_begin();
 
     VkBufferImageCopy region {
         .bufferOffset = 0,
@@ -835,7 +837,7 @@ void Device::impl::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t wi
         }
     };
     vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    endSingleTimeCommands(commandBuffer);
+    command_submit(commandBuffer);
 }
 
 VkSurfaceFormatKHR Device::impl::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
