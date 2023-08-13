@@ -1,7 +1,0 @@
-dep(mx:mx mx:image mx:watch glm:glm_static glfw:glfw3 vulkan)
-
-if(mac)
-    dep(IOSurface QuartzCore Metal AppKit CoreGraphics CoreFoundation Cocoa IOKit)
-elseif(linux)
-    dep(X11)
-endif()
