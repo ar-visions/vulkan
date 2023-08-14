@@ -332,10 +332,13 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     static int dpi_index = 0;
 	GLFWmonitor** monitors = glfwGetMonitors(&mcount);
 	if (mcount > dpi_index) {
-		glfwGetMonitorContentScale(monitors[dpi_index], &g->dpi_scale.x, &g->dpi_scale.y);
+        float fx, fy;
+		glfwGetMonitorContentScale(monitors[dpi_index], &fx, &fy);
+        g->dpi_scale.x = fx;
+		g->dpi_scale.y = fy;
 	} else {
-		g->dpi_scale.x = 1.0f;
-		g->dpi_scale.y = 1.0f;
+		g->dpi_scale.x = 1.0;
+		g->dpi_scale.y = 1.0;
 	}
 
     g->window = initWindow(sz);
@@ -1187,7 +1190,7 @@ Texture &GPU::impl::texture(Device &dev, vec2i sz, bool sampling, VkImageUsageFl
 void Texture::impl::create_image(ion::path texture_path, Asset type) {
     ion::image img = ion::image(texture_path);
     ion::rgba8 *pixels = img.data;
-    vec2i sz = { img.width(), img.height() };
+    vec2i sz = { int(img.width()), int(img.height()) };
     size_t image_size = sz.x * sz.y * 4;
     device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(sz.x, sz.y)))) + 1;
 

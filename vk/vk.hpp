@@ -101,7 +101,7 @@ struct GPU:mx {
         ResizeFn                resize; /// deprecate
         vec2i                   sz;
         VkPhysicalDeviceFeatures support;
-        vec2f                   dpi_scale;
+        vec2d                   dpi_scale;
 
         VkSampleCountFlagBits getUsableSampling(VkSampleCountFlagBits max);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
