@@ -24,25 +24,15 @@
 
 
 #include <vkh/vkh.h>
-
-#ifdef VKH_USE_VMA
-#include "vk_mem_alloc.h"
-#endif
+#include <vk/vk_mem_alloc.h>
 
 typedef struct _vkh_buffer_t {
 	VkhDevice				vkh;
 	VkBufferCreateInfo		infos;
 	VkBuffer				buffer;
-#ifdef VKH_USE_VMA
 	VmaAllocation			alloc;
 	VmaAllocationInfo		allocInfo;
 	VmaAllocationCreateInfo allocCreateInfo;
-#else
-	VkDeviceMemory			memory;
-	VkDeviceSize			size;
-	VkBufferUsageFlags		usageFlags;
-	VkhMemoryUsage			memprops;
-#endif
 	VkDescriptorBufferInfo	descriptor;
 	VkDeviceSize			alignment;
 	void*					mapped;

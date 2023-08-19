@@ -33,12 +33,8 @@ typedef struct _vkh_image_t { /// should store size here.  why not
 	VkImage					image;
 	uint32_t				width;
 	uint32_t				height;
-#ifdef VKH_USE_VMA
 	VmaAllocation			alloc;
 	VmaAllocationInfo		allocInfo;
-#else
-	VkDeviceMemory			memory;
-#endif
 	VkSampler				sampler;
 	VkImageView				view;
 	VkImageLayout			layout; //current layout

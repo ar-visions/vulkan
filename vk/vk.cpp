@@ -823,22 +823,12 @@ void Device::impl::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t wi
     VkCommandBuffer commandBuffer = command_begin();
 
     VkBufferImageCopy region {
-        .bufferOffset = 0,
-        .bufferRowLength = 0,
-        .bufferImageHeight = 0,
-        .imageSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .mipLevel = 0,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        },
-        .imageOffset = {0, 0, 0},
-        .imageExtent = {
-            width,
-            height,
-            1
-        }
+        0, 0, 0, 
+        { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 },
+        {0, 0, 0},
+        { width, height, 1 }
     };
+
     vkCmdCopyBufferToImage(commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
     command_submit(commandBuffer);
 }
@@ -899,21 +889,19 @@ void Device::impl::createLogicalDevice() {
     }
     
     /// set features used to mask of supported
-    VkPhysicalDeviceFeatures featured_used {
-        .sampleRateShading = gpu->support.sampleRateShading,
-	    .logicOp		   = gpu->support.logicOp,
-        .fillModeNonSolid  = gpu->support.fillModeNonSolid,
-        .samplerAnisotropy = gpu->support.samplerAnisotropy
-    };
+    VkPhysicalDeviceFeatures featured_used { };
+    featured_used.sampleRateShading = gpu->support.sampleRateShading;
+	featured_used.logicOp		    = gpu->support.logicOp;
+    featured_used.fillModeNonSolid  = gpu->support.fillModeNonSolid;
+    featured_used.samplerAnisotropy = gpu->support.samplerAnisotropy;
 
-    VkDeviceCreateInfo createInfo {
-        .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size()),
-        .pQueueCreateInfos       = queueCreateInfos.data(),
-        .enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size()),
-        .ppEnabledExtensionNames = deviceExtensions.data(),
-        .pEnabledFeatures        = &featured_used
-    };
+    VkDeviceCreateInfo createInfo { };
+    createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());
+    createInfo.pQueueCreateInfos       = queueCreateInfos.data();
+    createInfo.enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size());
+    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    createInfo.pEnabledFeatures        = &featured_used;
 
 
     if (enable_validation) {
@@ -1704,7 +1692,7 @@ void Device::impl::drawFrame(array<Pipeline>& pipelines) {
     vkResetCommandBuffer(cmd, 0);
 
     /// need another command buffer for presentation logic, or a 'Pipeline'
-    VkCommandBufferBeginInfo bi { .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    VkCommandBufferBeginInfo bi { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     vkBeginCommandBuffer(cmd, &bi);
 
     /// pre commands are run prior to pipelines

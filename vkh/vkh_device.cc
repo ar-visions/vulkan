@@ -179,11 +179,7 @@ void vkh_device_destroy_sampler (VkhDevice vkh, VkSampler sampler) {
 void vkh_device_drop (VkhDevice vkh) {
 	if (vkh && --vkh->refs == 0) {
 // VkEngine does this:
-//#ifdef VKH_USE_VMA
 //		vmaDestroyAllocator (vkh->e->allocator);
-//#else
-//		vkDestroyDevice (vkh->device, NULL);
-//#endif
 		free (vkh);
 	}
 }

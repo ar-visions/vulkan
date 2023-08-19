@@ -72,9 +72,7 @@ typedef struct _vk_engine_t {
 	struct GLFWwindow*					window;
 	VkhPresenter						renderer;
 	VkSampleCountFlagBits				max_samples;
-#ifdef VKH_USE_VMA
 	VmaAllocator						allocator;
-#endif
 	///
 } vk_engine_t;
 

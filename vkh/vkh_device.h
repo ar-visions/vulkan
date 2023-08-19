@@ -24,10 +24,7 @@
 
 #include <vkh/vkh.h>
 #include <vkh/vkh_phyinfo.h>
-
-#ifdef VKH_USE_VMA
-#include "vk_mem_alloc.h"
-#endif
+#include <vk/vk_mem_alloc.h>
 
 typedef struct _vkh_device_t {
 	size_t					refs;

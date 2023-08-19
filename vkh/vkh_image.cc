@@ -61,30 +61,10 @@ VkhImage _vkh_image_create (VkhDevice vkh, VkImageType imageType,
         pInfo->pNext = &metal_import;
 #endif
     }
-
-	/*
-	img->imported = false;
-	img->alloc	= VK_NULL_HANDLE;
-	img->image	= VK_NULL_HANDLE;
-	img->sampler= VK_NULL_HANDLE;
-	img->view	= VK_NULL_HANDLE;*/
-#ifdef VKH_USE_VMA
 	VmaAllocationCreateInfo allocInfo = { .usage = (VmaMemoryUsage)memprops };
 	VK_CHECK_RESULT(vmaCreateImage (vkh->e->allocator, pInfo, &allocInfo, &img->image, &img->alloc, &img->allocInfo));
-#else
-	VK_CHECK_RESULT(vkCreateImage(vkh->device, pInfo, NULL, &img->image));
-	VkMemoryRequirements memReq;
-	vkGetImageMemoryRequirements(vkh->device, img->image, &memReq);
-	VkMemoryAllocateInfo memAllocInfo = { .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-										  .allocationSize = memReq.size };
-	vkh_memory_type_from_properties(&vkh->e->memory_properties, memReq.memoryTypeBits, memprops,&memAllocInfo.memoryTypeIndex);
-	VK_CHECK_RESULT(vkAllocateMemory(vkh->device, &memAllocInfo, NULL, &img->memory));
-	VK_CHECK_RESULT(vkBindImageMemory(vkh->device, img->image, img->memory, 0));
-#endif
-
 	mtx_init(&img->mutex, mtx_plain);
 	img->refs = 1;
-
 	return img;
 }
 void vkh_image_drop(VkhImage img)
@@ -110,15 +90,8 @@ void vkh_image_drop(VkhImage img)
 		vkDestroySampler (img->vkh->device,img->sampler, NULL);
 
 	if (!img->imported) {
-#ifdef VKH_USE_VMA
 		vmaDestroyImage	(img->vkh->e->allocator, img->image, img->alloc);
-#else
-		vkDestroyImage	(img->vkh->device, img->image, NULL);
-		vkFreeMemory	(img->vkh->device, img->memory, NULL);
-
-#endif
 	}
-
 
 	free(img);
 	img = NULL;
@@ -373,23 +346,20 @@ void vkh_image_destroy_sampler (VkhImage img) {
 
 void* vkh_image_map (VkhImage img) {
 	void* data;
-#ifdef VKH_USE_VMA
 	vmaMapMemory(img->vkh->e->allocator, img->alloc, &data);
-#else
-#endif
 	return data;
 }
+
 void vkh_image_unmap (VkhImage img) {
-#ifdef VKH_USE_VMA
 	vmaUnmapMemory(img->vkh->e->allocator, img->alloc);
-#else
-#endif
 }
+
 void vkh_image_set_name (VkhImage img, const char* name){
 	if (img==NULL)
 		return;
 	vkh_device_set_object_name(img->vkh, VK_OBJECT_TYPE_IMAGE, (uint64_t)img->image, name);
 }
+
 uint64_t vkh_image_get_stride (VkhImage img) {
 	VkImageSubresource subres = {VK_IMAGE_ASPECT_COLOR_BIT,0,0};
 	VkSubresourceLayout layout = {0};
