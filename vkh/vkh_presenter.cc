@@ -95,29 +95,30 @@ bool vkh_presenter_draw (VkhPresenter r) {
 	}
 
 	VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-	VkSubmitInfo submit_info = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-								 .waitSemaphoreCount = 1,
-								 .pWaitSemaphores = &r->semaPresentEnd,
-								 .pWaitDstStageMask = &dstStageMask,
-								 .commandBufferCount = 1,
-								 .pCommandBuffers = &r->cmdBuffs[r->currentScBufferIndex],
-								 .signalSemaphoreCount = 1,
-								 .pSignalSemaphores = &r->semaDrawEnd
-								 };
+	VkSubmitInfo si = { };
+	si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	si.waitSemaphoreCount = 1;
+	si.pWaitSemaphores = &r->semaPresentEnd;
+	si.pWaitDstStageMask = &dstStageMask;
+	si.commandBufferCount = 1;
+	si.pCommandBuffers = &r->cmdBuffs[r->currentScBufferIndex];
+	si.signalSemaphoreCount = 1;
+	si.pSignalSemaphores = &r->semaDrawEnd;
 
 	vkDeviceWaitIdle(r->vkh->device);
 	vkWaitForFences	(r->vkh->device, 1, &r->fenceDraw, VK_TRUE, FENCE_TIMEOUT);
 	vkResetFences	(r->vkh->device, 1, &r->fenceDraw);
 
-	VK_CHECK_RESULT(vkQueueSubmit (r->queue, 1, &submit_info, r->fenceDraw));
+	VK_CHECK_RESULT(vkQueueSubmit (r->queue, 1, &si, r->fenceDraw));
 
 	/* Now present the image in the window */
-	VkPresentInfoKHR present = { .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-								 .waitSemaphoreCount = 1,
-								 .pWaitSemaphores = &r->semaDrawEnd,
-								 .swapchainCount = 1,
-								 .pSwapchains = &r->swapChain,
-								 .pImageIndices = &r->currentScBufferIndex };
+	VkPresentInfoKHR present = {};
+	present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	present.waitSemaphoreCount = 1;
+	present.pWaitSemaphores = &r->semaDrawEnd;
+	present.swapchainCount = 1;
+	present.pSwapchains = &r->swapChain;
+	present.pImageIndices = &r->currentScBufferIndex;
 
 	/* Make sure command buffer is finished before presenting */
 	vkQueuePresentKHR(r->queue, &present);
@@ -151,11 +152,14 @@ void vkh_presenter_build_blit_cmd (VkhPresenter r, VkImage blitSource, uint32_t 
 								.srcOffset = {0},
 								.dstOffset = {0,0,0},
 								.extent = {MIN(w,r->width), MIN(h,r->height),1}};*/
-		VkImageBlit bregion = { .srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-								.srcOffsets = {{ 0 }, { ion::i32(src_w), ion::i32(src_h), 1 }},
-								.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-								.dstOffsets = {{ 0 }, { ion::i32(dst_w), ion::i32(dst_h), 1 }}
-							  };
+		VkImageBlit bregion { };
+		bregion.srcSubresource 	= {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+		bregion.srcOffsets[0] = { 0 };
+		bregion.srcOffsets[1] = { ion::i32(src_w), ion::i32(src_h), 1 };
+
+		bregion.dstSubresource	= {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+		bregion.dstOffsets[0] = { 0 };
+		bregion.dstOffsets[1] = { ion::i32(dst_w), ion::i32(dst_h), 1 };
 
 		vkCmdBlitImage(cb, blitSource, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bltDstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bregion, VK_FILTER_NEAREST);
 
@@ -239,20 +243,21 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 	}
 
 	VkSwapchainKHR newSwapchain;
-	VkSwapchainCreateInfoKHR createInfo = { .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-											.surface = r->surface,
-											.minImageCount = surfCapabilities.minImageCount,
-											.imageFormat = r->format,
-											.imageColorSpace = r->colorSpace,
-											.imageExtent = {r->width,r->height},
-											.imageArrayLayers = 1,
-											.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-											.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
-											.preTransform = surfCapabilities.currentTransform,
-											.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-											.presentMode = r->presentMode,
-											.clipped = VK_TRUE,
-											.oldSwapchain = r->swapChain};
+	VkSwapchainCreateInfoKHR createInfo = { };
+	createInfo.sType 			= VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+	createInfo.surface 			= r->surface;
+	createInfo.minImageCount 	= surfCapabilities.minImageCount;
+	createInfo.imageFormat 		= r->format;
+	createInfo.imageColorSpace 	= r->colorSpace;
+	createInfo.imageExtent 		= {r->width,r->height};
+	createInfo.imageArrayLayers = 1;
+	createInfo.imageUsage 		= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+	createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	createInfo.preTransform 	= surfCapabilities.currentTransform;
+	createInfo.compositeAlpha 	= VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+	createInfo.presentMode 		= r->presentMode;
+	createInfo.clipped 			= VK_TRUE;
+	createInfo.oldSwapchain 	= r->swapChain;
 
 	VK_CHECK_RESULT(vkCreateSwapchainKHR (r->vkh->device, &createInfo, NULL, &newSwapchain));
 	if (r->swapChain != VK_NULL_HANDLE)

@@ -46,16 +46,14 @@ void vkh_buffer_reset(VkhBuffer buff){
 	if (buff->buffer)
 		vmaDestroyBuffer(buff->vkh->e->allocator, buff->buffer, buff->alloc);
 }
+
 void vkh_buffer_destroy(VkhBuffer buff){
 	if (buff->buffer)
 		vmaDestroyBuffer(buff->vkh->e->allocator, buff->buffer, buff->alloc);
-
-	if (buff->memory)
-		vkFreeMemory(buff->vkh->device, buff->memory, NULL);
-#endif
 	free(buff);
 	buff = NULL;
 }
+
 void vkh_buffer_resize(VkhBuffer buff, VkDeviceSize newSize, bool mapped){
 	vkh_buffer_reset(buff);
 	buff->infos.size = newSize;
@@ -63,29 +61,30 @@ void vkh_buffer_resize(VkhBuffer buff, VkDeviceSize newSize, bool mapped){
 }
 
 VkDescriptorBufferInfo vkh_buffer_get_descriptor (VkhBuffer buff){
-	VkDescriptorBufferInfo desc = {
-		.buffer = buff->buffer,
-		.offset = 0,
-		.range	= VK_WHOLE_SIZE};
+	VkDescriptorBufferInfo desc = { };
+	desc.buffer = buff->buffer;
+	desc.offset = 0;
+	desc.range	= VK_WHOLE_SIZE;
 	return desc;
 }
-
 
 VkResult vkh_buffer_map(VkhBuffer buff){
 	return vmaMapMemory(buff->vkh->e->allocator, buff->alloc, &buff->mapped);
 }
+
 void vkh_buffer_unmap(VkhBuffer buff){
 	vmaUnmapMemory(buff->vkh->e->allocator, buff->alloc);
 }
+
 VkBuffer vkh_buffer_get_vkbuffer (VkhBuffer buff){
 	return buff->buffer;
 }
+
 void* vkh_buffer_get_mapped_pointer (VkhBuffer buff){
 	//vmaFlushAllocation (buff->vkh->allocator, buff->alloc, buff->allocInfo.offset, buff->allocInfo.size);
 	return buff->allocInfo.pMappedData;
-
-#endif
 }
+
 void vkh_buffer_flush (VkhBuffer buff){
 	vmaFlushAllocation (buff->vkh->e->allocator, buff->alloc, buff->allocInfo.offset, buff->allocInfo.size);
 }

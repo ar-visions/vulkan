@@ -79,7 +79,7 @@ bool vkh_get_required_device_extensions (VkPhysicalDevice phy, const char** pExt
 
 	//https://vulkan.lunarg.com/doc/view/1.2.162.0/mac/1.2-extensions/vkspec.html#VK_KHR_portability_subset
 	_CHECK_DEV_EXT(VK_KHR_portability_subset);
-	VkPhysicalDeviceFeatures2 phyFeat2 = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+	VkPhysicalDeviceFeatures2 phyFeat2 = {VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
 
 	vkGetPhysicalDeviceFeatures2(phy, &phyFeat2);
 	return true;
@@ -99,7 +99,7 @@ const void* vkh_get_device_requirements (VkPhysicalDevice phy, VkPhysicalDeviceF
 
 #ifdef VK_VERSION_1_2
 	static VkPhysicalDeviceVulkan12Features enabledFeatures12 = {
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
+		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
 	};
 	enabledFeatures12.pNext = pNext;
 	pNext = &enabledFeatures12;
@@ -159,16 +159,16 @@ void vkh_device_init_debug_utils (VkhDevice vkh) {
 VkSampler vkh_device_create_sampler (VkhDevice vkh, VkFilter magFilter, VkFilter minFilter,
 							   VkSamplerMipmapMode mipmapMode, VkSamplerAddressMode addressMode){
 	VkSampler 		    sampler 		  = VK_NULL_HANDLE;
-	VkSamplerCreateInfo samplerCreateInfo = {
-		.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-		.magFilter	= magFilter,
-		.minFilter	= minFilter,
-		.mipmapMode	= mipmapMode,
-		.addressModeU = addressMode,
-		.addressModeV = addressMode,
-		.addressModeW = addressMode,
-		.maxAnisotropy= 1.0
-	};
+	VkSamplerCreateInfo samplerCreateInfo = { };
+
+	samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerCreateInfo.magFilter	= magFilter;
+	samplerCreateInfo.minFilter	= minFilter;
+	samplerCreateInfo.mipmapMode   = mipmapMode;
+	samplerCreateInfo.addressModeU = addressMode;
+	samplerCreateInfo.addressModeV = addressMode;
+	samplerCreateInfo.addressModeW = addressMode;
+	samplerCreateInfo.maxAnisotropy= 1.0;
 
 	VK_CHECK_RESULT(vkCreateSampler(vkh->device, &samplerCreateInfo, NULL, &sampler));
 	return sampler;
@@ -186,28 +186,22 @@ void vkh_device_drop (VkhDevice vkh) {
 
 void vkh_device_set_object_name (VkhDevice vkh, VkObjectType objectType, uint64_t handle, const char* name){
 	const VkDebugUtilsObjectNameInfoEXT info = {
-		.sType		 = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
-		.pNext		 = 0,
-		.objectType	 = objectType,
-		.objectHandle= handle,
-		.pObjectName = name
+		VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, 0, objectType, handle, name
 	};
 	SetDebugUtilsObjectNameEXT (vkh->device, &info);
 }
 void vkh_cmd_label_start (VkCommandBuffer cmd, const char* name, const float color[4]) {
 	const VkDebugUtilsLabelEXT info = {
-		.sType		= VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
-		.pNext		= 0,
-		.pLabelName= name
+		VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT, 0, name
 	};
 	memcpy ((void*)info.color, (void*)color, 4 * sizeof(float));
 	CmdBeginDebugUtilsLabelEXT (cmd, &info);
 }
 void vkh_cmd_label_insert (VkCommandBuffer cmd, const char* name, const float color[4]) {
 	const VkDebugUtilsLabelEXT info = {
-		.sType		= VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
-		.pNext		= 0,
-		.pLabelName= name
+		VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+		0,
+		name
 	};
 	memcpy ((void*)info.color, (void*)color, 4 * sizeof(float));
 	CmdInsertDebugUtilsLabelEXT (cmd, &info);
