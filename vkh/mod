@@ -6,7 +6,6 @@ else()
     cflags(+-Wno-c++11-narrowing +-Wno-switch +-Wno-format)
 endif()
 
-file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/Include" VULKAN_INCLUDE)
-includes(${VULKAN_INCLUDE})
+#includes(${VULKAN_INCLUDE})
 
 defines(VKH_USE_VMA)

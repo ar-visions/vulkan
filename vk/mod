@@ -1,13 +1,18 @@
 dep(mx:mx mx:image mx:watch glm:glm_static glfw:glfw3 @Vulkan)
 
-if(mac)
+if(APPLE)
     dep(IOSurface QuartzCore Metal AppKit CoreGraphics CoreFoundation Cocoa IOKit)
 elseif(LINUX)
     dep(X11)
 endif()
 
-# when parsing string C:\VulkanSDK\1.3.239.0/Include, Invalid character escape '\V'.
-file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/Include" VULKAN_INCLUDE)
+if(APPLE)
+    file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/macOS/include" VULKAN_INCLUDE)
+elseif(LINUX)
+    file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/include"       VULKAN_INCLUDE)
+else()
+    file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/Include"       VULKAN_INCLUDE)
+endif()
 includes(${VULKAN_INCLUDE})
 
 defines(VKH_USE_VMA)
