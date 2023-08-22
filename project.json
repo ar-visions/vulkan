@@ -7,7 +7,10 @@
             "name":     "glfw",
             "version":  "3.3.8",
             "commit":   "7482de6",
-            "url":      "https://github.com/glfw/glfw"
+            "url":      "https://github.com/glfw/glfw",
+            "cmake": {
+                "args-win": ["-DCMAKE_C_FLAGS=/MT","-DUSE_MSVC_RUNTIME_LIBRARY_DLL=0"]
+            }
         }
     ]
 }
