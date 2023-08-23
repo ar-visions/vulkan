@@ -31,13 +31,6 @@ const std::vector<symbol> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<symbol> deviceExtensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    "VK_KHR_portability_subset", /// goes along with the Instance ext: VK_KHR_portability_enumeration
-    "VK_EXT_metal_objects",
-    "VK_KHR_dedicated_allocation" /// for VMA with Vulkan >= 1.1
-};
-
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType,
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
@@ -114,6 +107,11 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT
     }
 }
 
+bool is_wayland() {
+    const char* session_type = std::getenv("XDG_SESSION_TYPE");
+    return session_type && std::strcmp(session_type, "wayland") == 0;
+}
+
 void Vulkan::impl::init() {
     static bool init = false;
     if (init) return;
@@ -141,7 +139,16 @@ void Vulkan::impl::init() {
 
     extensions = std::vector<symbol>();
     extensions.push_back("VK_KHR_surface");
-    extensions.push_back("VK_EXT_metal_surface");
+    if (is_apple()) {
+        extensions.push_back("VK_EXT_metal_surface");
+    } else if (is_win()) {
+        extensions.push_back("VK_KHR_win32_surface");
+    } else {
+        if (is_wayland())
+            extensions.push_back("VK_KHR_wayland_surface");
+        else
+            extensions.push_back("VK_KHR_xlib_surface");
+    }
     extensions.push_back("VK_KHR_portability_enumeration"); /// there is a _subset extension too but not sure if thats device
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -242,19 +249,22 @@ SwapChainSupportDetails GPU::querySwapChainSupport(GPU &gpu) {
     return querySwapChainSupport(gpu->phys, gpu->surface, gpu->details);
 }
 
-bool GPU::checkDeviceExtensionSupport(VkPhysicalDevice phys) {
+bool GPU::checkDeviceExtensionSupport(VkPhysicalDevice phys, std::vector<symbol> &exts) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(phys, nullptr, &extensionCount, nullptr);
 
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
     vkEnumerateDeviceExtensionProperties(phys, nullptr, &extensionCount, availableExtensions.data());
 
-    std::set<std::string> requiredExtensions(deviceExtensions.begin(), deviceExtensions.end());
-
+    std::set<std::string> requiredExtensions(exts.begin(), exts.end());
     for (const auto& extension : availableExtensions) {
         requiredExtensions.erase(extension.extensionName);
     }
 
+    //printf("the following device extensions are not supported (and need to be):");
+    //for (std::string ext: requiredExtensions) {
+    //    printf("device extension: %s\n", ext.c_str());
+    //}
     return requiredExtensions.empty();
 }
 
@@ -291,8 +301,9 @@ QueueFamilyIndices GPU::findQueueFamilies(GPU &gpu) {
     return findQueueFamilies(gpu->phys, gpu->surface);
 }
 
-bool GPU::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFamilyIndices &indices, SwapChainSupportDetails &swapChainSupport) {
-    bool extensionsSupported = checkDeviceExtensionSupport(phys);
+bool GPU::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFamilyIndices &indices,
+        SwapChainSupportDetails &swapChainSupport, std::vector<symbol> &exts) {
+    bool extensionsSupported = checkDeviceExtensionSupport(phys, exts);
 
     bool swapChainAdequate = false;
     if (extensionsSupported) {
@@ -362,9 +373,19 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
+    g->device_extensions = {};
+    g->device_extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    
+    if (is_apple()) {
+        g->device_extensions.push_back("VK_KHR_portability_subset");
+        g->device_extensions.push_back("VK_EXT_metal_objects");
+    }
+
+    g->device_extensions.push_back("VK_KHR_dedicated_allocation"); /// for VMA with Vulkan >= 1.1
+
     for (const auto& phys: devices) {
         g->indices = findQueueFamilies(phys, g->surface);
-        if (isDeviceSuitable(phys, g->surface, g->indices, g->details)) {
+        if (isDeviceSuitable(phys, g->surface, g->indices, g->details, g->device_extensions)) {
             g->phys        = phys;
             g->msaaSamples = g->getUsableSampling(VK_SAMPLE_COUNT_8_BIT);
             break;
@@ -899,8 +920,8 @@ void Device::impl::createLogicalDevice() {
     createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pQueueCreateInfos       = queueCreateInfos.data();
-    createInfo.enabledExtensionCount   = static_cast<uint32_t>(deviceExtensions.size());
-    createInfo.ppEnabledExtensionNames = deviceExtensions.data();
+    createInfo.enabledExtensionCount   = static_cast<uint32_t>(gpu->device_extensions.size());
+    createInfo.ppEnabledExtensionNames = gpu->device_extensions.data();
     createInfo.pEnabledFeatures        = &featured_used;
 
 

@@ -90,6 +90,7 @@ struct Texture;
 struct Device;
 
 struct GPU:mx {
+
     struct impl {
         VkInstance              instance;
         VkPhysicalDevice        phys        = VK_NULL_HANDLE;
@@ -102,6 +103,7 @@ struct GPU:mx {
         vec2i                   sz;
         VkPhysicalDeviceFeatures support;
         vec2d                   dpi_scale;
+        std::vector<symbol>     device_extensions;
 
         VkSampleCountFlagBits getUsableSampling(VkSampleCountFlagBits max);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -124,14 +126,18 @@ struct GPU:mx {
 
     static SwapChainSupportDetails querySwapChainSupport(GPU &gpu);
 
-    static bool checkDeviceExtensionSupport(VkPhysicalDevice phys);
+    /// this checkDeviceExt needs to init the exts elsewhere, at config time
+    static bool isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface,
+        QueueFamilyIndices &indices, SwapChainSupportDetails &swapChainSupport,
+        std::vector<symbol> &ext);
+    
+    static bool checkDeviceExtensionSupport(VkPhysicalDevice phys, std::vector<symbol> &ext);
 
     static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice phy, VkSurfaceKHR surface);
 
     static QueueFamilyIndices findQueueFamilies(GPU &gpu);
 
-    static bool isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFamilyIndices &indices, SwapChainSupportDetails &swapChainSupport);
-
+    
     static GPU select(vec2i sz, ResizeFn resize, void *user_data);
     
     mx_object(GPU, mx, impl);
