@@ -188,7 +188,8 @@ VkEngine vkengine_create (
 		perror ("glfwInit failed");
 		exit(-1);
 	}
-
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	
 	if (!glfwVulkanSupported()) {
 		perror ("glfwVulkanSupported return false.");
 		exit(-1);

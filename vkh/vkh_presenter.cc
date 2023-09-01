@@ -216,6 +216,8 @@ void _init_phy_surface(VkhPresenter r, VkFormat preferedFormat, VkPresentModeKHR
 	free(presentModes);
 }
 
+/// presenter should be made into a vk object and moved
+
 void vkh_presenter_create_swapchain (VkhPresenter r){
 	// Ensure all operations on the device have been finished before destroying resources
 	vkDeviceWaitIdle(r->vkh->device);
@@ -224,6 +226,7 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 	VK_CHECK_RESULT(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(r->vkh->e->vk_gpu->phys, r->surface, &surfCapabilities));
 	assert (surfCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
+	ion::Device &vk_device = r->vkh->e->vk_device;
 	// width and height are either both 0xFFFFFFFF, or both not 0xFFFFFFFF.
 	if (surfCapabilities.currentExtent.width == 0xFFFFFFFF) {
 		// If the surface size is undefined, the size is set to
@@ -257,12 +260,13 @@ void vkh_presenter_create_swapchain (VkhPresenter r){
 	createInfo.compositeAlpha 	= VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	createInfo.presentMode 		= r->presentMode;
 	createInfo.clipped 			= VK_TRUE;
-	createInfo.oldSwapchain 	= r->swapChain;
+	createInfo.oldSwapchain 	= r->swapChain ? r->swapChain : vk_device->swapChain; ///
 
-	VK_CHECK_RESULT(vkCreateSwapchainKHR (r->vkh->device, &createInfo, NULL, &newSwapchain));
+	VK_CHECK_RESULT(vkCreateSwapchainKHR (r->vkh->device, &createInfo, NULL, &newSwapchain)); /// we are effectively updating the swap chain on this device
 	if (r->swapChain != VK_NULL_HANDLE)
 		_swapchain_destroy(r);
 	r->swapChain = newSwapchain;
+	vk_device->swapChain = newSwapchain; /// update this data just for integrity; the two systems must merge a bit more in the presentation area; namely presenter should find a place in vk and startup there
 
 	VK_CHECK_RESULT(vkGetSwapchainImagesKHR(r->vkh->device, r->swapChain, &r->imgCount, NULL));
 	assert (r->imgCount>0);

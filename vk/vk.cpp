@@ -121,6 +121,9 @@ void Vulkan::impl::init() {
         throw std::runtime_error("validation layers requested, but not available!");
     }
 
+    v_major = 1;
+    v_minor = 2;
+
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName   = "ion:vk";
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -141,6 +144,7 @@ void Vulkan::impl::init() {
     extensions.push_back("VK_KHR_surface");
     if (is_apple()) {
         extensions.push_back("VK_EXT_metal_surface");
+        extensions.push_back("VK_KHR_portability_enumeration"); /// there is a _subset extension too but not sure if thats device
     } else if (is_win()) {
         extensions.push_back("VK_KHR_win32_surface");
     } else {
@@ -149,7 +153,7 @@ void Vulkan::impl::init() {
         else
             extensions.push_back("VK_KHR_xlib_surface");
     }
-    extensions.push_back("VK_KHR_portability_enumeration"); /// there is a _subset extension too but not sure if thats device
+    
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
@@ -217,8 +221,8 @@ VkSampleCountFlagBits GPU::impl::getUsableSampling(VkSampleCountFlagBits max) {
 }
 
 GLFWwindow *GPU::initWindow(vec2i &sz) {
-    glfwInit();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    //glfwInit();
+    //glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     return glfwCreateWindow(sz.x, sz.y, "Vulkan", nullptr, nullptr);        
 }
 
