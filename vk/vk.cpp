@@ -52,8 +52,10 @@ std::vector<symbol> Vulkan::impl::getRequiredExtensions() {
     glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
     std::vector<symbol> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-    #ifdef __APPLE__
+    #ifndef WIN32
     extensions.push_back("VK_KHR_portability_enumeration");
+    #endif
+    #ifdef __APPLE__
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     //extensions.push_back("VK_EXT_metal_surface");
     #endif
@@ -122,7 +124,7 @@ void Vulkan::impl::init() {
     }
 
     v_major = 1;
-    v_minor = 2;
+    v_minor = 3;
 
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName   = "ion:vk";
@@ -151,8 +153,8 @@ void Vulkan::impl::init() {
         if (is_wayland())
             extensions.push_back("VK_KHR_wayland_surface");
         else
-            extensions.push_back("VK_KHR_xlib_surface");
-    }
+            extensions.push_back("VK_KHR_xcb_surface"); // xlib
+    }//VK_KHR_xcb_surface
     
     extensions.push_back("VK_KHR_get_physical_device_properties2");
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -364,7 +366,7 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
 
     g->instance = vk->inst();
 
-    if (glfwCreateWindowSurface(instance, g->window, nullptr, &g->surface) != VK_SUCCESS) {
+    if (glfwCreateWindowSurface(g->instance, g->window, nullptr, &g->surface) != VK_SUCCESS) {
         throw std::runtime_error("failed to create window surface!");
     }
 
