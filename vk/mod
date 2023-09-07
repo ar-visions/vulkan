@@ -11,9 +11,9 @@ if(APPLE)
     includes(${VULKAN_INCLUDE})
 elseif(UNIX)
     # this is installed with a package currently
-    #file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/include"       VULKAN_INCLUDE)
+    #file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/include" VULKAN_INCLUDE)
 else()
-    file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/Include"       VULKAN_INCLUDE)
+    file(TO_CMAKE_PATH "$ENV{VULKAN_SDK}/Include" VULKAN_INCLUDE)
     includes(${VULKAN_INCLUDE})
 endif()
 

@@ -1,0 +1,9 @@
+if(APPLE)
+    skip()
+else()
+    cpp(17)
+    dep(vulkan:nvh)
+
+    includes(${EXTERN_DIR}/nvpro_core/nvvk)
+    src({$EXTERN_DIR}/nvpro_core/nvvk/*.cpp)
+endif()
