@@ -5,5 +5,5 @@ else()
     dep(vulkan:nvh)
 
     includes(${EXTERN_DIR}/nvpro_core/nvvk)
-    src({$EXTERN_DIR}/nvpro_core/nvvk/*.cpp)
+    src(${EXTERN_DIR}/nvpro_core/nvvk/*.cpp)
 endif()

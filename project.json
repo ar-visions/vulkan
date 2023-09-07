@@ -19,6 +19,12 @@
             "url":      "https://github.com/fmtlib/fmt"
         },
         {
+            "name":     "tinygltf",
+            "version":  "2.8.15",
+            "commit":   "acf1e8a",
+            "url":      "https://github.com/syoyo/tinygltf"
+        },
+        {
             "name":     "nvpro_core",
             "version":  "1",
             "commit":   "775b17ef7c7e270731e61d82c5f6e08be9caa64e",

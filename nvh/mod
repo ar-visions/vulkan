@@ -1,10 +1,11 @@
-includes(${p})
-
 if(APPLE)
     skip()
 endif()
 
 dep(vulkan:nvp)
 
+includes(${EXTERN_DIR}/nvpro_core)
 includes(${EXTERN_DIR}/nvpro_core/nvh)
+includes(${EXTERN_DIR}/nvpro_core/nvp)
+
 src(${EXTERN_DIR}/nvpro_core/nvh/*.cpp)

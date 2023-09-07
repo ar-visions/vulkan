@@ -1,11 +1,11 @@
-# most nvidia code does not use headers well, they use them like google
-# however it should be preferred to never have to change a single thing when we import code; no patches when possible
-includes(${p})
-
 if(APPLE)
     skip()
 else()
+    includes(${EXTERN_DIR}/nvpro_core)
     includes(${EXTERN_DIR}/nvpro_core/nvp)
+    includes(${EXTERN_DIR}/glfw/deps) # stb_image (probably needs its own thing)
+    
+    defines(PROJECT_NAME="nvp")
     src(${EXTERN_DIR}/nvpro_core/nvp/*.cpp)
 
     if(UNIX)
@@ -13,4 +13,5 @@ else()
     else()
         src(-${EXTERN_DIR}/nvpro_core/nvp/nvpsystem_linux.cpp)
     endif()
+
 endif()
