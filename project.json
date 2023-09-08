@@ -16,27 +16,31 @@
             "name":     "fmt",
             "version":  "10.1.1",
             "commit":   "f5e5435",
-            "url":      "https://github.com/fmtlib/fmt"
+            "url":      "https://github.com/fmtlib/fmt",
+            "platforms": ["win","lin"]
         },
         {
             "name":     "tinygltf",
             "version":  "2.8.15",
             "commit":   "acf1e8a",
-            "url":      "https://github.com/syoyo/tinygltf"
+            "url":      "https://github.com/syoyo/tinygltf",
+            "platforms": ["win","lin"]
         },
         {
             "name":     "nvpro_core",
             "version":  "1",
             "commit":   "775b17ef7c7e270731e61d82c5f6e08be9caa64e",
             "url":      "https://github.com/nvpro-samples/nvpro_core",
-            "resource": true
+            "resource": true,
+            "platforms": ["win","lin"]
         },
         {
             "name":     "vk_video_samples",
             "version":  "1",
             "commit":   "b36f79c1756456ee5e8316c084a41f44e3c244b4",
             "url":      "https://github.com/nvpro-samples/vk_video_samples",
-            "resource": true
+            "resource": true,
+            "platforms": ["win","lin"]
         }
     ]
 }
