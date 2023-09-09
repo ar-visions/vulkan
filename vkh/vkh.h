@@ -22,7 +22,7 @@
 #ifndef VK_HELPERS_H
 #define VK_HELPERS_H
 
-#define _CRT_SECURE_NO_WARNINGS
+//#define _CRT_SECURE_NO_WARNINGS
 
 #include <vulkan/vulkan.h>
 #include <vulkan/vulkan_metal.h>
