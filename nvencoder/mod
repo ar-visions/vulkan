@@ -5,7 +5,7 @@ else()
     dep(vulkan:vk vulkan:nvh vulkan:nvvk dl pthread)
 
     includes(${EXTERN_DIR}/vk_video_samples/vk_video_encoder
-            ${EXTERN_DIR}/vk_video_samples/common/include)
-
+             ${EXTERN_DIR}/vk_video_samples/common/include)
+    
     src(${EXTERN_DIR}/vk_video_samples/vk_video_encoder/*.cpp)
 endif()
