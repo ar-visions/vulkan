@@ -1,9 +1,12 @@
-dep(mx:mx mx:image mx:watch glm:glm_static glfw:glfw3 @Vulkan)
+dep(mx:mx mx:image mx:watch glm:glm_static @Vulkan)
+dep(glfw:glfw3)
 
 if(APPLE)
     dep(IOSurface QuartzCore Metal AppKit CoreGraphics CoreFoundation Cocoa IOKit)
 elseif(UNIX)
-    dep(X11)
+    dep(X11 GLX)
+    #dep(X11-xcb)
+    dep(xcb-xkb xkbcommon xkbcommon-x11)
 endif()
 
 if(APPLE)

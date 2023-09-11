@@ -6,21 +6,6 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <vk/tiny_obj_loader.h>
 
-#include <iostream>
-#include <fstream>
-#include <stdexcept>
-#include <algorithm>
-#include <chrono>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <cstdint>
-#include <limits>
-#include <array>
-#include <optional>
-#include <set>
-#include <unordered_map>
-
 using namespace ion;
 
 static const bool               enable_validation = is_debug();
@@ -117,6 +102,7 @@ bool is_wayland() {
 void Vulkan::impl::init() {
     static bool init = false;
     if (init) return;
+
     init = true;
 
     if (enable_validation && !check_validation()) {
@@ -137,8 +123,6 @@ void Vulkan::impl::init() {
     createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     createInfo.pApplicationInfo = &app_info;
     createInfo.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
-
-
 
     auto extensions = getRequiredExtensions();
 

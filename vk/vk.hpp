@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLM_ENABLE_EXPERIMENTAL
@@ -10,6 +11,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/hash.hpp>
 
+/// this shouldnt be in here lol
 #include <vk/tiny_obj_loader.h>
 
 #include <mx/mx.hpp>
@@ -17,20 +19,12 @@
 
 #include <watch/watch.hpp>
 
-//#include <iostream>
-//#include <fstream>
-#include <stdexcept>
-#include <algorithm>
-#include <chrono>
-#include <vector>
-//#include <cstring>
 #include <cstdlib>
 #include <cstdint>
 #include <limits>
 #include <array>
 #include <optional>
 #include <set>
-//#include <unordered_map>
 
 #define VMA_VULKAN_VERSION 1001000 // Vulkan 1.1 (skia does not use 1.2)
 #include <vk/vk_mem_alloc.h>
@@ -141,6 +135,10 @@ struct GPU:mx {
     static GPU select(vec2i sz, ResizeFn resize, void *user_data);
     
     mx_object(GPU, mx, impl);
+};
+
+struct Window:mx {
+    
 };
 
 struct Device:mx {
