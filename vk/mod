@@ -6,7 +6,7 @@ if(APPLE)
 elseif(UNIX)
     dep(X11 GLX)
     #dep(X11-xcb)
-    dep(xcb-xkb xkbcommon xkbcommon-x11)
+    dep(xcb-xkb xkbcommon xkbcommon-x11 nvcuvid nvidia-encode)
 endif()
 
 if(APPLE)
