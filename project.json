@@ -40,8 +40,10 @@
             "version":  "1",
             "commit":   "b36f79c1756456ee5e8316c084a41f44e3c244b4",
             "url":      "https://github.com/nvpro-samples/vk_video_samples",
-            "resource": true,
-            "platforms": ["win","lin"]
+            "platforms": ["win","lin"],
+            "cmake": {
+                "path":"vk_video_encoder"
+            }
         }
     ]
 }

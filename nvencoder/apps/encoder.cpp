@@ -108,7 +108,7 @@ int8_t parseArguments(EncodeConfig *encodeConfig, int argc, char *argv[])
 
     encodeConfig->codec = VK_VIDEO_CODEC_OPERATION_ENCODE_H264_BIT_EXT; //H264
     encodeConfig->chromaFormatIDC = STD_VIDEO_H264_CHROMA_FORMAT_IDC_420; // YUV 420
-    encodeConfig->inputVkFormat = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM; // YUV420 8bpp VkFormat
+    encodeConfig->inputVkFormat = VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM; // YUV420 8bpp VkFormat - VK_FORMAT_B8G8R8A8_UNORM
     encodeConfig->codecBlockAlignment = H264MbSizeAlignment; // H264
     encodeConfig->alignedWidth = (encodeConfig->width + encodeConfig->codecBlockAlignment - 1) & ~(encodeConfig->codecBlockAlignment - 1);
     encodeConfig->alignedHeight = (encodeConfig->height + encodeConfig->codecBlockAlignment - 1) & ~(encodeConfig->codecBlockAlignment - 1);
