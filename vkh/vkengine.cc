@@ -173,10 +173,35 @@ bool instance_extension_supported (VkExtensionProperties* instanceExtProps, uint
 
 static VkEngine singleton;
 
+void glfw_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	vk_engine_t *e = (vk_engine_t*)glfwGetWindowUserPointer(window);
+	e->fn_key(e->user, key, scancode, action, mods);
+}
+
+void glfw_button(GLFWwindow* window, int button, int action, int mods) {
+	vk_engine_t *e = (vk_engine_t*)glfwGetWindowUserPointer(window);
+	e->fn_button(e->user, button, action, mods);
+}
+
+void glfw_move(GLFWwindow* window, double x, double y) {
+	vk_engine_t *e = (vk_engine_t*)glfwGetWindowUserPointer(window);
+	e->fn_move(e->user, x, y);
+}
+
+void glfw_scroll(GLFWwindow* window, double x, double y) {
+	vk_engine_t *e = (vk_engine_t*)glfwGetWindowUserPointer(window);
+	e->fn_scroll(e->user, x, y);
+}
+
+void glfw_char(GLFWwindow* window, uint32_t code) {
+	vk_engine_t *e = (vk_engine_t*)glfwGetWindowUserPointer(window);
+	e->fn_char(e->user, code);
+}
+
 VkEngine vkengine_create (
 	uint32_t version_major, uint32_t version_minor, const char* app_name,
 	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, VkSampleCountFlagBits max_samples,
-	uint32_t width, uint32_t height, int dpi_index, void *user_data)
+	uint32_t width, uint32_t height, int dpi_index, ion::mx &user)
 {
 
 	if (singleton)
@@ -197,13 +222,21 @@ VkEngine vkengine_create (
 
 	VkEngine e     = (VkEngine)calloc(1, sizeof(vk_engine_t));
 	e->refs        = 1;
-	e->vk_gpu      = ion::GPU::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)user_data);
+	e->vk_gpu      = ion::Window::select(ion::vec2i(width, height), ion::ResizeFn(nullptr), (void*)ion::null);
 	e->vk_device   = ion::Device::create(e->vk_gpu); /// extensions should be application defined; they are loaded only when available anyway. we dont NEED anything more complex
 	e->max_samples = max_samples;
 	e->window 	   = e->vk_gpu->window;
 	e->pi 	       = vkh_phyinfo_create(e->vk_gpu->phys, e->vk_gpu->surface);
 	e->memory_properties = e->pi->memProps; // redundant
 	e->gpu_props   = e->pi->properties;
+	e->user		   = user;
+
+	glfwSetKeyCallback (e->window, glfw_key);
+	glfwSetMouseButtonCallback(e->window, glfw_button);
+	glfwSetCursorPosCallback(e->window, glfw_move);
+	glfwSetScrollCallback(e->window, glfw_scroll);
+	glfwSetCharCallback(e->window, glfw_char);
+	glfwSetWindowUserPointer(e->window, (void*)e);
 
 	ion::Vulkan vk;
 	VmaVulkanFunctions m_VulkanFunctions = {};
@@ -318,6 +351,11 @@ bool vkengine_should_close(VkEngine e) {
 	return glfwWindowShouldClose (e->window);
 }
 
+bool vkengine_poll_events(VkEngine e) {
+	glfwPollEvents();
+	return true;
+}
+
 void vkengine_set_title(VkEngine e, const char* title) {
 	glfwSetWindowTitle(e->window, title);
 }
@@ -346,22 +384,14 @@ void vkengine_wait_idle (VkEngine e) {
 	vkDeviceWaitIdle(e->vk_device->device);
 }
 
-void vkengine_set_key_callback (VkEngine e, GLFWkeyfun key_callback){
-	glfwSetKeyCallback (e->window, key_callback);
+void vkengine_key_callback 		(VkEngine e, FnKey fn_key) 	  { e->fn_key    = fn_key; }
+void vkengine_button_callback 	(VkEngine e, FnButton button) { e->fn_button = button; }
+void vkengine_move_callback 	(VkEngine e, FnMove move)	  { e->fn_move   = move;   }
+
+void vkengine_scroll_callback   (VkEngine e, FnScroll scroll) {
+	e->fn_scroll = scroll;
 }
 
-void vkengine_set_mouse_but_callback (VkEngine e, GLFWmousebuttonfun onMouseBut){
-	glfwSetMouseButtonCallback(e->window, onMouseBut);
-}
-
-void vkengine_set_cursor_pos_callback (VkEngine e, GLFWcursorposfun onMouseMove){
-	glfwSetCursorPosCallback(e->window, onMouseMove);
-}
-
-void vkengine_set_scroll_callback (VkEngine e, GLFWscrollfun onScroll){
-	glfwSetScrollCallback(e->window, onScroll);
-}
-
-void vkengine_set_char_callback (VkEngine e, GLFWcharfun onChar){
-	glfwSetCharCallback(e->window, onChar);
+void vkengine_char_callback (VkEngine e, FnChar chr){
+	e->fn_char = chr;
 }

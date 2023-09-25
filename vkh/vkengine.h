@@ -56,11 +56,17 @@
 
 struct GLFWwindow;
 
+typedef void (*FnKey)   (ion::mx&, int, int, int, int);
+typedef void (*FnButton)(ion::mx&, int, int, int);
+typedef void (*FnMove)  (ion::mx&, double, double);
+typedef void (*FnScroll)(ion::mx&, double, double);
+typedef void (*FnChar)  (ion::mx&, unsigned int);
+
 /// merging app & engine makes sense.
 /// also reducing down what is in vkvg: redundancy in copies of vkh device data and its props (replaced with methods)
 typedef struct _vk_engine_t {
 	size_t								refs;
-	ion::GPU							vk_gpu;
+	ion::Window							vk_gpu;
 	ion::Device							vk_device;
 	VkhPhyInfo							pi;
 	ion::Vulkan							vk;
@@ -73,25 +79,28 @@ typedef struct _vk_engine_t {
 	VkhPresenter						renderer;
 	VkSampleCountFlagBits				max_samples;
 	VmaAllocator						allocator;
+
+	FnKey								fn_key;
+	FnButton							fn_button;
+	FnMove								fn_move;
+	FnScroll							fn_scroll;
+	FnChar								fn_char;
+
+	ion::mx								user; // this is so we have a user identifier and type
 	///
 } vk_engine_t;
-
-typedef void (*GLFWkeyfun)(struct GLFWwindow*, int, int, int, int);
-typedef void (*GLFWmousebuttonfun)(struct GLFWwindow*, int, int, int);
-typedef void (*GLFWcursorposfun)(struct GLFWwindow*, double, double);
-typedef void (*GLFWscrollfun)(struct GLFWwindow*, double, double);
-typedef void (*GLFWcharfun)(struct GLFWwindow*, unsigned int);
 
 vk_engine_t*   vkengine_create(
 	uint32_t version_major, uint32_t version_minor, const char* app_name,
 	VkPhysicalDeviceType preferedGPU, VkPresentModeKHR presentMode, VkSampleCountFlagBits max_samples, /// max_samples is a soft max for users of the app; it must also be checked against the hardware sample max
-	uint32_t width, uint32_t height, int dpi_index, void *user_data);
+	uint32_t width, uint32_t height, int dpi_index, ion::mx &user);
 
 void 				vkengine_dump_available_layers   	();
 bool 				vkengine_try_get_phyinfo 			(VkhPhyInfo* phys, uint32_t phyCount, VkPhysicalDeviceType gpuType, VkhPhyInfo* phy);
 void 				vkengine_drop						(VkEngine e);
 VkEngine 			vkengine_grab						(VkEngine e);
 bool 				vkengine_should_close				(VkEngine e);
+bool 				vkengine_poll_events				(VkEngine e);
 void 				vkengine_close						(VkEngine e);
 void 				vkengine_dump_Infos					(VkEngine e);
 void 				vkengine_set_title					(VkEngine e, const char* title);
@@ -101,11 +110,11 @@ VkPhysicalDevice	vkengine_get_physical_device		(VkEngine e);
 VkQueue				vkengine_get_queue					(VkEngine e);
 uint32_t			vkengine_get_queue_fam_idx			(VkEngine e);
 void 				vkengine_get_queues_properties     	(VkEngine e, VkQueueFamilyProperties** qFamProps, uint32_t* count);
-void 				vkengine_set_key_callback			(VkEngine e, GLFWkeyfun key_callback);
-void 				vkengine_set_mouse_but_callback		(VkEngine e, GLFWmousebuttonfun onMouseBut);
-void 				vkengine_set_cursor_pos_callback	(VkEngine e, GLFWcursorposfun onMouseMove);
-void 				vkengine_set_scroll_callback		(VkEngine e, GLFWscrollfun onScroll);
-void 				vkengine_set_char_callback			(VkEngine e, GLFWcharfun onChar);
+void 				vkengine_key_callback 				(VkEngine e, FnKey fn_key);
+void 				vkengine_button_callback 			(VkEngine e, FnButton button);
+void 				vkengine_move_callback 				(VkEngine e, FnMove move);
+void 				vkengine_scroll_callback 			(VkEngine e, FnScroll scroll);
+void 				vkengine_char_callback 				(VkEngine e, FnChar chr);
 void 				vkengine_wait_idle					(VkEngine e);
 void 				vkengine_dpi_scale					(VkEngine e, float *sx, float *sy, int monitor_index);
 

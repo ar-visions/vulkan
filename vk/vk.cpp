@@ -188,11 +188,11 @@ Vulkan::impl::~impl() {
     glfwTerminate();
 }
 
-GPU::operator VkPhysicalDevice() {
+Window::operator VkPhysicalDevice() {
     return data->phys;
 }
 
-VkSampleCountFlagBits GPU::impl::getUsableSampling(VkSampleCountFlagBits max) {
+VkSampleCountFlagBits Window::impl::getUsableSampling(VkSampleCountFlagBits max) {
     VkPhysicalDeviceProperties physicalDeviceProperties;
     vkGetPhysicalDeviceProperties(phys, &physicalDeviceProperties);
 
@@ -207,13 +207,13 @@ VkSampleCountFlagBits GPU::impl::getUsableSampling(VkSampleCountFlagBits max) {
     return VK_SAMPLE_COUNT_1_BIT;
 }
 
-GLFWwindow *GPU::initWindow(vec2i &sz) {
+GLFWwindow *Window::initWindow(vec2i &sz) {
     //glfwInit();
     //glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     return glfwCreateWindow(sz.x, sz.y, "Vulkan", nullptr, nullptr);        
 }
 
-SwapChainSupportDetails GPU::querySwapChainSupport(VkPhysicalDevice phys, VkSurfaceKHR surface, SwapChainSupportDetails &details) {
+SwapChainSupportDetails Window::querySwapChainSupport(VkPhysicalDevice phys, VkSurfaceKHR surface, SwapChainSupportDetails &details) {
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys, surface, &details.capabilities) != VK_SUCCESS)
         throw std::runtime_error("vkGetPhysicalDeviceSurfaceCapabilitiesKHR failure");
 
@@ -236,11 +236,11 @@ SwapChainSupportDetails GPU::querySwapChainSupport(VkPhysicalDevice phys, VkSurf
     return details;
 }
 
-SwapChainSupportDetails GPU::querySwapChainSupport(GPU &gpu) {
+SwapChainSupportDetails Window::querySwapChainSupport(Window &gpu) {
     return querySwapChainSupport(gpu->phys, gpu->surface, gpu->details);
 }
 
-bool GPU::checkDeviceExtensionSupport(VkPhysicalDevice phys, std::vector<symbol> &exts) {
+bool Window::checkDeviceExtensionSupport(VkPhysicalDevice phys, std::vector<symbol> &exts) {
     uint32_t extensionCount;
     vkEnumerateDeviceExtensionProperties(phys, nullptr, &extensionCount, nullptr);
 
@@ -259,7 +259,7 @@ bool GPU::checkDeviceExtensionSupport(VkPhysicalDevice phys, std::vector<symbol>
     return requiredExtensions.empty();
 }
 
-QueueFamilyIndices GPU::findQueueFamilies(VkPhysicalDevice phy, VkSurfaceKHR surface) {
+QueueFamilyIndices Window::findQueueFamilies(VkPhysicalDevice phy, VkSurfaceKHR surface) {
     QueueFamilyIndices indices;
 
     uint32_t queueFamilyCount = 0;
@@ -288,11 +288,11 @@ QueueFamilyIndices GPU::findQueueFamilies(VkPhysicalDevice phy, VkSurfaceKHR sur
     return indices;
 }
 
-QueueFamilyIndices GPU::findQueueFamilies(GPU &gpu) {
+QueueFamilyIndices Window::findQueueFamilies(Window &gpu) {
     return findQueueFamilies(gpu->phys, gpu->surface);
 }
 
-bool GPU::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFamilyIndices &indices,
+bool Window::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFamilyIndices &indices,
         SwapChainSupportDetails &swapChainSupport, std::vector<symbol> &exts) {
     bool extensionsSupported = checkDeviceExtensionSupport(phys, exts);
 
@@ -308,16 +308,16 @@ bool GPU::isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface, QueueFam
     return indices.isComplete() && extensionsSupported && swapChainAdequate  && supportedFeatures.samplerAnisotropy;
 }
 
-void GPU::impl::framebuffer_resized(GLFWwindow* window, int width, int height) {
+void Window::impl::framebuffer_resized(GLFWwindow* window, int width, int height) {
     /// i think acquire next image works with surface
-    //GPU::impl *g = (GPU::impl*)(glfwGetWindowUserPointer(window));
+    //Window::impl *g = (Window::impl*)(glfwGetWindowUserPointer(window));
     //g->sz = vec2i { width, height };
     //g->resize(g->sz, g->user_data);
 }
 
 /// select gpu, initialize vulkan, create window and register user
-GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
-    GPU g = GPU();
+Window Window::select(vec2i sz, ResizeFn resize, void *user_data) {
+    Window g = Window();
 
     /// this is from vk engine
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -384,7 +384,7 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     }
     
     if (g->phys == VK_NULL_HANDLE) {
-        throw std::runtime_error("failed to find a suitable GPU!");
+        throw std::runtime_error("failed to find a suitable Window!");
     }
 
     vkGetPhysicalDeviceFeatures(g->phys, &g->support);
@@ -396,7 +396,7 @@ GPU GPU::select(vec2i sz, ResizeFn resize, void *user_data) {
     return g;
 }
 
-uint32_t GPU::impl::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+uint32_t Window::impl::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(phys, &memProperties);
 
@@ -410,7 +410,7 @@ uint32_t GPU::impl::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pr
     return 0;
 }
 
-GPU::impl::~impl() {
+Window::impl::~impl() {
     vkDestroySurfaceKHR(instance, surface, nullptr);
     glfwDestroyWindow(window);
 }
@@ -1064,7 +1064,8 @@ void Device::impl::createRenderPass() {
     }
 }
 
-Device Device::create(GPU &gpu) {
+/// this should be classified as a Renderer; Device is too common though
+Device Device::create(Window &gpu) {
     Device dev;
     dev->gpu = gpu;
     dev->textureFormat = VK_FORMAT_B8G8R8A8_UNORM; /// i dont really wnat to make this an argument.  lots are unsupported and i want to support vkvg's generic
@@ -1175,7 +1176,7 @@ void Device::impl::loop(lambda<void(array<Pipeline>&)> select) {
     vkDeviceWaitIdle(device);
 }
 
-Texture &GPU::impl::texture(Device &dev, vec2i sz, bool sampling, VkImageUsageFlagBits usage) {
+Texture &Window::impl::texture(Device &dev, vec2i sz, bool sampling, VkImageUsageFlagBits usage) {
     static Texture tx = Texture();
     tx->device = dev;
     tx->format = dev->textureFormat;

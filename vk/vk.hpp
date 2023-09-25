@@ -83,7 +83,7 @@ using ResizeFn = void(*)(vec2i&, void*);
 struct Texture;
 struct Device;
 
-struct GPU:mx {
+struct Window:mx {
 
     struct impl {
         VkInstance              instance;
@@ -95,9 +95,9 @@ struct GPU:mx {
         SwapChainSupportDetails details;
         ResizeFn                resize; /// deprecate
         vec2i                   sz;
-        VkPhysicalDeviceFeatures support;
+        VkPhysicalDeviceFeatures support; // move to generic
         vec2d                   dpi_scale;
-        std::vector<symbol>     device_extensions;
+        std::vector<symbol>     device_extensions; // move to generic
 
         VkSampleCountFlagBits getUsableSampling(VkSampleCountFlagBits max);
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
@@ -118,7 +118,7 @@ struct GPU:mx {
     
     static SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice phys, VkSurfaceKHR surface, SwapChainSupportDetails &details);
 
-    static SwapChainSupportDetails querySwapChainSupport(GPU &gpu);
+    static SwapChainSupportDetails querySwapChainSupport(Window &gpu);
 
     /// this checkDeviceExt needs to init the exts elsewhere, at config time
     static bool isDeviceSuitable(VkPhysicalDevice phys, VkSurfaceKHR surface,
@@ -129,21 +129,17 @@ struct GPU:mx {
 
     static QueueFamilyIndices findQueueFamilies(VkPhysicalDevice phy, VkSurfaceKHR surface);
 
-    static QueueFamilyIndices findQueueFamilies(GPU &gpu);
+    static QueueFamilyIndices findQueueFamilies(Window &gpu);
 
     
-    static GPU select(vec2i sz, ResizeFn resize, void *user_data);
+    static Window select(vec2i sz, ResizeFn resize, void *user_data);
     
-    mx_object(GPU, mx, impl);
-};
-
-struct Window:mx {
-    
+    mx_object(Window, mx, impl);
 };
 
 struct Device:mx {
     struct impl {
-        GPU                         gpu;
+        Window                      gpu;
         VkDevice                    device;
         VkQueue                     graphicsQueue;
         VkQueue                     presentQueue;
@@ -215,7 +211,7 @@ struct Device:mx {
         type_register(impl);
     };
 
-    static Device create(GPU &gpu);
+    static Device create(Window &gpu);
 
     operator VkDevice();
     mx_object(Device, mx, impl);

@@ -79,7 +79,7 @@ struct HelloTriangleApplication:mx {
     struct impl {
         Vulkan    vk { 1, 0 }; /// this lazy loads 1.0 when GPU performs that action [singleton data]
         vec2i     sz;          /// store current window size
-        GPU       gpu;         /// GPU class, responsible for holding onto GPU, Surface and GLFWwindow
+        Window    gpu;         /// GPU class, responsible for holding onto GPU, Surface and GLFWwindow
         Device    device;      /// Device created with GPU
         
         Pipeline pipeline; /// pipeline for single object scene
@@ -92,7 +92,7 @@ struct HelloTriangleApplication:mx {
 
         /// initialize with size
         void init(vec2i &sz) {
-            gpu = GPU::select(sz);
+            gpu = Window::select(sz);
             glfwSetWindowUserPointer(gpu->window, this);
             glfwSetFramebufferSizeCallback(gpu->window, framebufferResizeCallback);
             device = Device::create(gpu);
