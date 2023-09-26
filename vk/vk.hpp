@@ -218,19 +218,15 @@ struct Device:mx {
 };
 
 enums(Asset, undefined, 
-    "undefined, color, normal, material, reflect",
      undefined, color, normal, material, reflect);
 
 enums(VA, Position,
-    "Position, Normal, UV, Color, Tangent, BiTangent",
      Position, Normal, UV, Color, Tangent, BiTangent);
 
 enums(Rendition, none,
-    "none, shader, wireframe",
      none, shader, wireframe);
 
 enums(ShadeModule, undefined,
-    "undefined, vertex, fragment, compute",
      undefined, vertex, fragment, compute);
 
 /// this is not actually needed in our current model of Vertex, as it uses the meta()
