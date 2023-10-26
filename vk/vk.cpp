@@ -208,8 +208,8 @@ VkSampleCountFlagBits Window::impl::getUsableSampling(VkSampleCountFlagBits max)
 }
 
 GLFWwindow *Window::initWindow(vec2i &sz) {
-    //glfwInit();
-    //glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwInit();
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     return glfwCreateWindow(sz.x, sz.y, "Vulkan", nullptr, nullptr);        
 }
 
@@ -325,11 +325,6 @@ Window Window::select(vec2i sz, ResizeFn resize, void *user_data) {
 	glfwWindowHint(GLFW_FLOATING,   GLFW_FALSE);
 	glfwWindowHint(GLFW_DECORATED,  GLFW_TRUE);
 
-	/// control over the dpi selection can be looked up by the user, or forced off at an app scale
-	/// we can offer that form of index of monitors in another api
-    /// its important to get dpi under control from the start
-    /// ok, so backbuffer cases will usually render to the on-screen buffer. that means they must also be high dpi. this is obvious
-    /// dont leave it to the user to check this, again, and again, and again. a graphics api should facilitate graphics optimally
 	int mcount;
     static int dpi_index = 0;
 	GLFWmonitor** monitors = glfwGetMonitors(&mcount);
@@ -1426,9 +1421,13 @@ VkShaderModule Pipeline::impl::createShaderModule(const array<char>& code) {
     createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data);
 
     VkShaderModule shaderModule;
+    int test2 = 0;
+    test2++;
     if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("failed to create shader module!");
     }
+    int test = 0;
+    test++;
 
     return shaderModule;
 }
