@@ -450,6 +450,8 @@ struct Pipeline:mx {
 
         /// start monitoring for changes, also recompiles shaders each time (if a shader does not compile on first go, it will error right away and thats useful)
         data->start(); /// the monitor needs the shader and the model so it can extrapolate what to listen for
+        int test = 0;
+        test++;
     }
 };
 

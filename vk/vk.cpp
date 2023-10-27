@@ -1302,10 +1302,12 @@ std::vector<VkVertexInputAttributeDescription> Pipeline::impl::getAttributeDescr
     attributeDescriptions.resize(props->len());
 
     auto get_format = [](prop &p) {
-        if (p.member_type == typeof(vec2f)) return VK_FORMAT_R32G32_SFLOAT;
-        if (p.member_type == typeof(vec3f)) return VK_FORMAT_R32G32B32_SFLOAT;
-        if (p.member_type == typeof(vec4f)) return VK_FORMAT_R32G32B32A32_SFLOAT;
-        if (p.member_type == typeof(float)) return VK_FORMAT_R32_SFLOAT;
+        if (p.member_type == typeof(glm::vec2)) return VK_FORMAT_R32G32_SFLOAT;
+        if (p.member_type == typeof(glm::vec3)) return VK_FORMAT_R32G32B32_SFLOAT;
+        if (p.member_type == typeof(glm::vec4)) return VK_FORMAT_R32G32B32A32_SFLOAT;
+        if (p.member_type == typeof(float))     return VK_FORMAT_R32_SFLOAT;
+        ///
+        assert(false);
         return VK_FORMAT_UNDEFINED;
     };
 
