@@ -1333,7 +1333,7 @@ void Pipeline::impl::start() {
         
         /// if there are no files it doesnt load, or reload.. thats kind of not a bug
         rld = [data=this](bool first, array<path_op> &ops) {
-            printf("compiling shaders");
+            console.log("compiling shaders");
             for (path_op &op: ops) {
                 str ext = op->path.ext4();
                 /// compile all .vert and .frag files
@@ -1413,7 +1413,7 @@ void Pipeline::impl::createIndexBuffer(std::vector<uint32_t> &indices) {
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
-
+/// the array initializer is quite broken when performing a sized allocation; also code buffer is not sized
 VkShaderModule Pipeline::impl::createShaderModule(const array<char>& code) {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1421,14 +1421,9 @@ VkShaderModule Pipeline::impl::createShaderModule(const array<char>& code) {
     createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data);
 
     VkShaderModule shaderModule;
-    int test2 = 0;
-    test2++;
     if (vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
         throw std::runtime_error("failed to create shader module!");
     }
-    int test = 0;
-    test++;
-
     return shaderModule;
 }
 
