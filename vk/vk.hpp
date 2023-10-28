@@ -442,7 +442,7 @@ struct Pipeline:mx {
                 data->textures[i - 1] = Texture::load(
                     data->gfx->device, data->gfx->model, Asset(i));
 
-            path p = fmt {"models/{0}.obj", { str(data->gfx->model) }}; /// obj could have different level of details
+            path p = fmt {"models/{0}.obj", { str(data->gfx->model) }};
             console.test(p.exists(), "model resource not found");
             data->template loadModel<V>(p.cs()); /// keeps vector in stack
             data->createDescriptorSets();

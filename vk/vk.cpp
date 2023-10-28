@@ -842,7 +842,8 @@ void Device::impl::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t wi
 
 VkSurfaceFormatKHR Device::impl::chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) {
     for (const auto& availableFormat : availableFormats) {
-        if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        if (availableFormat.format     == VK_FORMAT_R8G8B8A8_SRGB && // was VK_FORMAT_B8G8R8A8_SRGB (incompatible with png/jpeg loader, internal rgba format)
+            availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             return availableFormat;
         }
     }
@@ -1063,7 +1064,7 @@ void Device::impl::createRenderPass() {
 Device Device::create(Window &gpu) {
     Device dev;
     dev->gpu = gpu;
-    dev->textureFormat = VK_FORMAT_B8G8R8A8_UNORM; /// i dont really wnat to make this an argument.  lots are unsupported and i want to support vkvg's generic
+    dev->textureFormat = VK_FORMAT_R8G8B8A8_SRGB;//VK_FORMAT_B8G8R8A8_UNORM; /// i dont really wnat to make this an argument.  lots are unsupported and i want to support vkvg's generic
     dev->createLogicalDevice();
     dev->createSwapChain();
     dev->createImageViews();
@@ -1265,6 +1266,7 @@ Texture Texture::load(Device &dev, symbol name, Asset type) {
     assert(path.exists());
     tx->device = dev;
     tx->format = dev->swapChainImageFormat;
+    tx->usage  = VkImageUsageFlagBits(VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
     tx->create_image(path, type);
     tx->create_image_view();
     tx->create_sampler();
