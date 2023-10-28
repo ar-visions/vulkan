@@ -309,6 +309,7 @@ struct Graphics:mx { /// dont need to store generic data; this is used as an arg
 
 struct Pipeline:mx {
     struct impl {
+        mx                          user; // user data
         Device                      device;
         memory*                     gmem; // graphics memory (grabbed)
         GraphicsData*               gfx;
