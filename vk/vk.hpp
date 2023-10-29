@@ -218,7 +218,7 @@ struct Device:mx {
 };
 
 enums(Asset, undefined, 
-     undefined, color, normal, material, reflect);
+     undefined, color, normal, material, reflect, normal_equirect); /// populate from objects normal map first, and then adjust by equirect if its provided
 
 enums(VA, Position,
      Position, Normal, UV, Color, Tangent, BiTangent);
@@ -334,7 +334,7 @@ struct Pipeline:mx {
         std::vector<VkVertexInputAttributeDescription> attr_desc;
 
         Texture textures[Asset::count - 1];
-
+        
         void start();
         void cleanup(); /// impl calls cleanup, but cleanup is called prior to a reload
         void createUniformBuffers();

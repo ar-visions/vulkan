@@ -1260,7 +1260,8 @@ void Texture::impl::create_image(vec2i size) {
     sz     = size;
 }
 
-Texture Texture::load(Device &dev, symbol name, Asset type) {
+/// make this not a static method; change the texture already in memory
+bool Texture::load(Device &dev, symbol name, Asset type) {
     Texture tx;
     ion::path path = fmt {"textures/{0}.{1}.png", { name, type.symbol() }};
     assert(path.exists());
