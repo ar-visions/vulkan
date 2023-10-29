@@ -218,7 +218,7 @@ struct Device:mx {
 };
 
 enums(Asset, undefined, 
-     undefined, color, normal, material, reflect, normal_equirect); /// populate from objects normal map first, and then adjust by equirect if its provided
+     undefined, color, normal, material, reflect); /// populate from objects normal map first, and then adjust by equirect if its provided
 
 enums(VA, Position,
      Position, Normal, UV, Color, Tangent, BiTangent);
@@ -268,17 +268,22 @@ struct Texture:mx {
         ion::path       path;
         Asset           asset_type;
         vec2i           sz;
-
+        bool            updated;
+        
         void create_image_view();
         void create_sampler();
         void create_image(ion::path texture_path, Asset type); // VK_FORMAT_R8G8B8A8_SRGB
         void create_image(vec2i sz);
+        void update_image(ion::image &img);
+        
         ~impl();
         operator bool() { return image != VK_NULL_HANDLE; }
         type_register(impl);
     };
     mx_object(Texture, mx, impl);
+
     static Texture load(Device &dev, symbol name, Asset type);
+    void update(image img);
 };
 
 struct GraphicsData {
@@ -334,7 +339,7 @@ struct Pipeline:mx {
         std::vector<VkVertexInputAttributeDescription> attr_desc;
 
         Texture textures[Asset::count - 1];
-        
+
         void start();
         void cleanup(); /// impl calls cleanup, but cleanup is called prior to a reload
         void createUniformBuffers();
@@ -345,6 +350,7 @@ struct Pipeline:mx {
 
         void createDescriptorSetLayout();
         void createDescriptorSets();
+        void updateDescriptorSets();
         void createGraphicsPipeline();
 
         template <typename V>

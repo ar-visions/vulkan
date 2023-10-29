@@ -1184,17 +1184,14 @@ Texture &Window::impl::texture(Device &dev, vec2i sz, bool sampling, VkImageUsag
     return tx;
 }
 
-void Texture::impl::create_image(ion::path texture_path, Asset type) {
-    ion::image img = ion::image(texture_path);
+void Texture::impl::update_image(ion::image &img) {
     ion::rgba8 *pixels = img.data;
     vec2i sz = { int(img.width()), int(img.height()) };
     size_t image_size = sz.x * sz.y * 4;
-    device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(sz.x, sz.y)))) + 1;
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
-
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
     device->createBuffer(image_size,
@@ -1207,13 +1204,6 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
         memcpy(vdata, pixels, static_cast<size_t>(image_size));
     vkUnmapMemory(device, stagingBufferMemory);
 
-    device->createImage(sz.x, sz.y, device->mipLevels,
-        VK_SAMPLE_COUNT_1_BIT, format,
-        VK_IMAGE_TILING_OPTIMAL,
-        usage,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        image, memory);
-
     device->transitionImageLayout(image, format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         device->mipLevels);
     device->copyBufferToImage(stagingBuffer, image, static_cast<uint32_t>(sz.x), static_cast<uint32_t>(sz.y));
@@ -1224,8 +1214,27 @@ void Texture::impl::create_image(ion::path texture_path, Asset type) {
 
     /// we dont always want to do this; parameterize
     device->generateMipmaps(image, format, sz.x, sz.y, device->mipLevels);
+
     width      = sz.x;
     height     = sz.y;
+    updated    = true;
+}
+
+void Texture::impl::create_image(ion::path texture_path, Asset type) {
+    ion::image img = ion::image(texture_path);
+    ion::rgba8 *pixels = img.data;
+    vec2i sz = { int(img.width()), int(img.height()) };
+    
+    device->mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(sz.x, sz.y)))) + 1;
+
+    device->createImage(sz.x, sz.y, device->mipLevels,
+        VK_SAMPLE_COUNT_1_BIT, format,
+        VK_IMAGE_TILING_OPTIMAL,
+        usage,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        image, memory); /// these are output vars
+    
+    update_image(img);
     asset_type = type;
 }
 
@@ -1261,7 +1270,7 @@ void Texture::impl::create_image(vec2i size) {
 }
 
 /// make this not a static method; change the texture already in memory
-bool Texture::load(Device &dev, symbol name, Asset type) {
+Texture Texture::load(Device &dev, symbol name, Asset type) {
     Texture tx;
     ion::path path = fmt {"textures/{0}.{1}.png", { name, type.symbol() }};
     assert(path.exists());
@@ -1272,6 +1281,10 @@ bool Texture::load(Device &dev, symbol name, Asset type) {
     tx->create_image_view();
     tx->create_sampler();
     return tx;
+}
+
+void Texture::update(image img) {
+    data->update_image(img);
 }
 
 void Pipeline::impl::createUniformBuffers() {
@@ -1589,20 +1602,17 @@ void Pipeline::impl::createDescriptorSetLayout() {
     }
 }
 
-/// get this working, test this
-void Pipeline::impl::createDescriptorSets() {
-    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
-    VkDescriptorSetAllocateInfo allocInfo {};
-    allocInfo.sType                 = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool        = device->descriptorPool;
-    allocInfo.descriptorSetCount    = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
-    allocInfo.pSetLayouts           = layouts.data();
-
-    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets!");
+void Pipeline::impl::updateDescriptorSets() {
+    bool updated = false;
+    for (int a = 0; a < Asset::count - 1; a++) { /// todo: remove 'undefined' Texture enum; very confusing idea!
+        if (textures[a]->updated) {
+            updated = true;
+            break;
+        }
     }
-
+    if (!updated)
+        return;
+    
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorBufferInfo bufferInfo {};
         bufferInfo.buffer = uniformBuffers[i];
@@ -1638,6 +1648,25 @@ void Pipeline::impl::createDescriptorSets() {
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
+
+    for (int a = 0; a < Asset::count - 1; a++)
+        textures[a]->updated = false;
+}
+
+/// get this working, test this
+void Pipeline::impl::createDescriptorSets() {
+    std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+    VkDescriptorSetAllocateInfo allocInfo {};
+    allocInfo.sType                 = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool        = device->descriptorPool;
+    allocInfo.descriptorSetCount    = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    allocInfo.pSetLayouts           = layouts.data();
+
+    descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+    if (vkAllocateDescriptorSets(device, &allocInfo, descriptorSets.data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+    updateDescriptorSets();
 }
 
 void Pipeline::impl::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) {
@@ -1712,7 +1741,8 @@ void Device::impl::drawFrame(array<Pipeline>& pipelines) {
 
     /// render pass for each pipeline
     for (Pipeline &pipeline: pipelines) {
-        pipeline->uniform_update();
+        pipeline->uniform_update(); /// this user function may update textures in sync with the frame
+        pipeline->updateDescriptorSets(); /// make sure textures are updated
         pipeline->recordCommandBuffer(cmd, imageIndex);
     }
 
