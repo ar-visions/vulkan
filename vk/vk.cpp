@@ -431,13 +431,13 @@ void Device::impl::recreateSwapChain() {
 }
 
 void Device::impl::createDescriptorPool() {
-    std::array<VkDescriptorPoolSize, 1 + (Asset::count - 1)> poolSizes{};
+    std::array<VkDescriptorPoolSize, 1 + Asset::count> poolSizes{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
     ///
-    for (int i = 1; i < Asset::count; i++) {
-        poolSizes[i].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        poolSizes[i].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    for (int i = 0; i < Asset::count; i++) {
+        poolSizes[i + 1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        poolSizes[i + 1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
     }
 
     VkDescriptorPoolCreateInfo poolInfo{};
@@ -1392,8 +1392,8 @@ void Pipeline::impl::cleanup() {
     }
 
     /// delete texture here (not required i think, when we recreate it shouldnt matter that the pipeline is no longer)
-    for (int i = 1; i < Asset::count; i++)
-        textures[i - 1] = Texture();
+    for (int i = 0; i < Asset::count; i++)
+        textures[i] = Texture();
 
     vkFreeDescriptorSets(device, device->descriptorPool,
         uint32_t(descriptorSets.size()), descriptorSets.data());
@@ -1574,7 +1574,7 @@ void Pipeline::impl::createGraphicsPipeline() {
 
 // fix this, get this working; its basically a duplicate of 
 void Pipeline::impl::createDescriptorSetLayout() {
-    VkDescriptorSetLayoutBinding layoutBinding[1 + Asset::count - 1];
+    VkDescriptorSetLayoutBinding layoutBinding[1 + Asset::count]; // uniform buffer + samplers[asset_count]
     memset(&layoutBinding, 0, sizeof(layoutBinding));
 
     layoutBinding[0].binding = 0;
@@ -1584,12 +1584,12 @@ void Pipeline::impl::createDescriptorSetLayout() {
     layoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
     /// once this works, go back to array i think.
-    for (int i = 1; i < Asset::count; i++) {
-        layoutBinding[i].binding = i;
-        layoutBinding[i].descriptorCount = 1;
-        layoutBinding[i].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        layoutBinding[i].pImmutableSamplers = nullptr;
-        layoutBinding[i].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    for (int i = 0; i < Asset::count; i++) {
+        layoutBinding[i+1].binding = i+1;
+        layoutBinding[i+1].descriptorCount = 1;
+        layoutBinding[i+1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        layoutBinding[i+1].pImmutableSamplers = nullptr;
+        layoutBinding[i+1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
     }
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
@@ -1604,7 +1604,7 @@ void Pipeline::impl::createDescriptorSetLayout() {
 
 void Pipeline::impl::updateDescriptorSets() {
     bool updated = false;
-    for (int a = 0; a < Asset::count - 1; a++) { /// todo: remove 'undefined' Texture enum; very confusing idea!
+    for (int a = 0; a < Asset::count; a++) { /// todo: remove 'undefined' Texture enum; very confusing idea!
         if (textures[a]->updated) {
             updated = true;
             break;
@@ -1619,7 +1619,7 @@ void Pipeline::impl::updateDescriptorSets() {
         bufferInfo.offset = 0;
         bufferInfo.range  = gfx->u_type->base_sz;//sizeof(UniformBufferObject);
 
-        std::array<VkWriteDescriptorSet, 1 + Asset::count - 1> descriptorWrites { };
+        std::array<VkWriteDescriptorSet, 1 + Asset::count> descriptorWrites { };
         descriptorWrites[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptorWrites[0].dstSet          = descriptorSets[i];
         descriptorWrites[0].dstBinding      = 0;
@@ -1628,28 +1628,28 @@ void Pipeline::impl::updateDescriptorSets() {
         descriptorWrites[0].descriptorCount = 1;
         descriptorWrites[0].pBufferInfo     = &bufferInfo;
 
-        VkDescriptorImageInfo imageInfo[Asset::count - 1];
+        VkDescriptorImageInfo imageInfo[Asset::count];
         memset(imageInfo, 0, sizeof(imageInfo));
-        for (size_t a = 0; a < Asset::count - 1; a++) {
+        for (size_t a = 0; a < Asset::count; a++) {
             imageInfo[a].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo[a].imageView   = textures[a]->view;
             imageInfo[a].sampler     = textures[a]->sampler; /// if images are not found, they are converted into constant 2x2 image
         }
 
-        for (int ii = 1; ii < Asset::count; ii++) {
-            descriptorWrites[ii].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            descriptorWrites[ii].dstSet          = descriptorSets[i];
-            descriptorWrites[ii].dstBinding      = ii;
-            descriptorWrites[ii].dstArrayElement = 0;
-            descriptorWrites[ii].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorWrites[ii].descriptorCount = 1;
-            descriptorWrites[ii].pImageInfo      = &imageInfo[ii - 1];
+        for (int ii = 0; ii < Asset::count; ii++) {
+            descriptorWrites[ii+1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            descriptorWrites[ii+1].dstSet          = descriptorSets[i];
+            descriptorWrites[ii+1].dstBinding      = ii+1;
+            descriptorWrites[ii+1].dstArrayElement = 0;
+            descriptorWrites[ii+1].descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            descriptorWrites[ii+1].descriptorCount = 1;
+            descriptorWrites[ii+1].pImageInfo      = &imageInfo[ii];
         }
 
         vkUpdateDescriptorSets(device, static_cast<uint32_t>(descriptorWrites.size()), descriptorWrites.data(), 0, nullptr);
     }
 
-    for (int a = 0; a < Asset::count - 1; a++)
+    for (int a = 0; a < Asset::count; a++)
         textures[a]->updated = false;
 }
 

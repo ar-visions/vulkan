@@ -217,8 +217,8 @@ struct Device:mx {
     mx_object(Device, mx, impl);
 };
 
-enums(Asset, undefined, 
-     undefined, color, normal, material, reflect); /// populate from objects normal map first, and then adjust by equirect if its provided
+enums(Asset, color, 
+     color, normal, material, reflect); /// populate from objects normal map first, and then adjust by equirect if its provided
 
 enums(VA, Position,
      Position, Normal, UV, Color, Tangent, BiTangent);
@@ -338,7 +338,7 @@ struct Pipeline:mx {
         VkVertexInputBindingDescription                binding_desc;
         std::vector<VkVertexInputAttributeDescription> attr_desc;
 
-        Texture textures[Asset::count - 1];
+        Texture textures[Asset::count];
 
         void start();
         void cleanup(); /// impl calls cleanup, but cleanup is called prior to a reload
@@ -445,8 +445,8 @@ struct Pipeline:mx {
             data->createGraphicsPipeline();
 
             /// load texture assets for all enumerables (minus undefined)
-            for (size_t i = 1; i < Asset::count; i++)
-                data->textures[i - 1] = Texture::load(
+            for (size_t i = 0; i < Asset::count; i++)
+                data->textures[i] = Texture::load(
                     data->gfx->device, data->gfx->model, Asset(i));
 
             path p = fmt {"models/{0}.obj", { str(data->gfx->model) }};
